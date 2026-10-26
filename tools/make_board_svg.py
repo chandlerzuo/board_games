@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""依原版棋盤掃描量得之格子位置，繪製向量版棋盤 board.svg。
+"""依原版棋盤掃描量得之格子位置，為每個主題繪製向量版棋盤 board-<主題>.svg。
 
 座標與 index.html 的 BOXES 相同（掃描圖 2122×3000 座標，扣除裁切偏移 SCAN 後逆時針轉 90 度成橫式）。
-執行：python3 tools/make_board_svg.py  → 輸出 board.svg
+執行：python3 tools/make_board_svg.py  → 輸出 board-sanguo.svg、board-shuihu.svg
 """
 import os
 import re
@@ -223,16 +223,6 @@ DEFS = '''
 <pattern id="pBarber" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)"><rect width="18" height="18" fill="#fff"/><rect width="6" height="18" fill="#d8282b"/><rect x="9" width="5" height="18" fill="#1f5fbf"/></pattern>
 <pattern id="pLattice" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M0,5 h10 M5,0 v10" stroke="#7a2a0c" stroke-width="1.8"/></pattern>
 <pattern id="pCloud" width="40" height="30" patternUnits="userSpaceOnUse"><path d="M6,20 q0,-8 8,-6 q2,-7 9,-4 q6,-2 7,5 q6,1 4,6z" fill="#fff" fill-opacity=".22"/></pattern>
-<symbol id="castle" viewBox="0 0 100 100">
-  <path d="M50 8 l4 10 h-8z" fill="#c0392b"/><rect x="49" y="4" width="2" height="12" fill="#333"/>
-  <path d="M22 40 q28-22 56 0 z" fill="url(#gRoof)" stroke="#111" stroke-width="2"/>
-  <path d="M30 26 q20-14 40 0 l-4 6 h-32z" fill="#c62828" stroke="#111" stroke-width="2"/>
-  <rect x="30" y="31" width="40" height="10" fill="#f6b93b" stroke="#111" stroke-width="2"/>
-  <path d="M10 58 q40-24 80 0 z" fill="url(#gRoofB)" stroke="#111" stroke-width="2"/>
-  <rect x="16" y="57" width="68" height="28" fill="#f8f1d8" stroke="#111" stroke-width="2"/>
-  <g fill="url(#gPillar)" stroke="#111" stroke-width="1.5"><rect x="22" y="62" width="7" height="23"/><rect x="38" y="62" width="7" height="23"/><rect x="55" y="62" width="7" height="23"/><rect x="71" y="62" width="7" height="23"/></g>
-  <rect x="6" y="85" width="88" height="8" fill="#8d6e63" stroke="#111" stroke-width="2"/>
-</symbol>
 <symbol id="soldiers" viewBox="0 0 100 100">
   <g stroke="#111" stroke-width="1.6" stroke-linejoin="round">
   <path d="M74 6 l4 10 l-4 3 l-4 -3z M74 18 v78" stroke="#fff" stroke-width="3.5" fill="#fff"/>
