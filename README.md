@@ -1,6 +1,8 @@
-# Board Games
+# 英雄擲天下
 
-A property-and-siege board game in the style of the original *三國風雲*. It recreates the original board, rule book, poker cards, event cards and territory deeds, and can be played in several themes.
+以三國、水滸為題材的回合制策略棋盤遊戲。擲骰行軍，購置領地、建設城池，招募武將單挑攻城，善用錦囊妙計扭轉戰局。支援2至4人同機對戰或挑戰電腦，率先佔領二十處領地者一統天下。
+
+A property-and-siege board game in the style of the original *三國風雲*. It recreates the original board, rule book, poker cards, event cards and territory deeds, and can be played in several themes. The repository folder is `board_games`.
 
 ## Themes
 
@@ -27,17 +29,24 @@ Pick the theme on the offline setup screen, or as host in the online lobby. The 
 | `index.html` | Page markup and styles |
 | `engine.js` | Rules engine (no UI). Runs in the browser for offline play and in Node for online play |
 | `client.js` | Board, side panel, dialogs and hover tips; the offline and online adapters |
+| `texts.js` | Rules book and square descriptions, shared by the web version and the WeChat mini game |
 | `cards.js` | SVG artwork for the 54 poker cards |
 | `themes.js` | Theme data: square names, character names and card names for each theme |
 | `theme-shuihu-art.js` | Water Margin card portraits, descriptions and special-card art |
 | `board-sanguo.svg`, `board-shuihu.svg` | One board per theme |
-| `tools/make_board_svg.py` | Generates the board files from the names in `themes.js` |
+| `tools/make_board_svg.py` | Generates the board files from the names in `themes.js` (`--mobile` writes the portrait phone boards) |
+| `wechat/` | WeChat mini game version (see [`wechat/README.md`](wechat/README.md)) |
+| `tools/build_wechat.js`, `tools/wechat-preview/` | Builds the mini game's images and shared files; previews it in a browser |
 | `server/server.js` | Online game server (Node.js, no dependencies) |
 | `server/form.js` | Lets the server read answers to dialogs that contain form fields |
 
 ## Play offline (one computer)
 
 Open `index.html` directly in a browser. Each seat can be a human or the computer; several humans can share one screen (the game asks you to pass the device before showing private cards). Pick the theme on the setup screen, or open `index.html?theme=shuihu` to start with Water Margin selected. `index.html?demo` runs a computer-only game; add `&theme=shuihu` for Water Margin.
+
+## Play on WeChat (mini game)
+
+`wechat/` is a WeChat mini game version with a portrait, phone-sized layout. Build it with `node tools/build_wechat.js`, then open the `wechat/` folder in WeChat DevTools. [`wechat/README.md`](wechat/README.md) covers the layout, how to let up to 15 friends test it as a 體驗版 (trial version), and what to fix before formal release.
 
 ## Play online (local test)
 

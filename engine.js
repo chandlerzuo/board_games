@@ -8,7 +8,10 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 'use strict';
 
-const S = { startCash: 15000, startTroops: 1500, passStart: 2000, winTerr: 20, aiDelay: 450 };
+const S = { startCash: 15000, startTroops: 1500, passStart: 2000, winTerr: 20, aiDelay: 450, stepMs: 110, readMs: 0 };
+// 操作提示：依裝置不同（網頁用滑鼠、手機用點按），由 newGame 的 opts.hints 替換
+const HINT_BASE = { card: '滑鼠移到牌上可看數值', tile: '滑鼠移到格子上可查看領地資訊' };
+let HINT = HINT_BASE;
 const CITY_TOLL = { 1000: [500, 1000, 2000], 1500: [800, 1500, 3000], 2000: [1000, 2000, 4000] }; // 領地／小城／大城稅金
 const FIELD_TOLL = [500, 1000, 2000, 4000, 8000]; // 依地主擁有古戰場座數
 const BUILD_COST = 600;                           // 建城費用（建小城、小城改建大城各一次）
@@ -98,7 +101,17 @@ const DIE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 /* ------------------------------------------------------------------ */
 /* 介面轉接器由外部注入（瀏覽器單機版或連線伺服器） */
 let UI = null;
-const sleep = ms => UI.sleep(ms);
+/* ---- 閱讀停頓：電腦回合的每條消息停留 S.readMs 毫秒，讓玩家看清楚每一步 ----
+ * 消息排隊顯示；引擎的下一次等待（sleep、提問、輪到人類、交換玩家、宣布勝負）都會先等前面的消息讀完。
+ * 畫面端由 UI.log(html, { dur, wait }) 得知每條消息要停多久、還要等多久才輪到它；skipReading() 可跳過。 */
+let readUntil = 0, readSkip = null;
+function waitRead() {
+  const ms = readUntil - Date.now();
+  if (ms <= 0) return Promise.resolve();
+  return Promise.race([UI.sleep(ms), new Promise(r => { readSkip = r; })]);
+}
+function skipReading() { readUntil = 0; if (readSkip) { const r = readSkip; readSkip = null; r(); } }
+const sleep = ms => Promise.all([UI.sleep(ms), waitRead()]);
 const rnd = n => Math.floor(Math.random() * n);
 const pickRandom = a => a[rnd(a.length)];
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -115,13 +128,19 @@ const pname = p => `<b style="color:${p.color}">${esc(p.name)}</b>`;
 const tname = i => `<b>${TILES[i].n}</b>`;
 const humans = () => G.players.filter(p => !p.ai && p.alive);
 
-const log = html => UI.log(html);
+function log(html) {
+  const cur = G && G.cur != null ? G.players[G.cur] : null;
+  if (!(S.readMs && cur && cur.ai)) { UI.log(html); return; }
+  const now = Date.now(), start = Math.max(now, readUntil);
+  readUntil = start + S.readMs;
+  UI.log(html, { dur: S.readMs, wait: start - now });
+}
 const render = () => UI.render();
 const flashDeck = k => UI.flash(k);
 
 /* ---- 對話框：每個提問都指定對象玩家 ---- */
 // buttons: [{label, value, cls, disabled}]；value 可為函式 b => …，b 提供 querySelector 讀取表單；回傳 undefined 表示輸入不正確
-const ask = (p, title, body, buttons) => UI.ask(p, title, body, buttons);
+const ask = (p, title, body, buttons) => waitRead().then(() => UI.ask(p, title, body, buttons));
 const ok = (p, title, body) => ask(p, title, body, [{ label: '確定', value: true, cls: 'pri' }]);
 // 人類玩家顯示對話框；電腦只記錄
 async function tell(p, title, body) { log(body); render(); if (!p.ai) await ok(p, title, body); else await sleep(S.aiDelay); }
@@ -325,7 +344,7 @@ async function ransom(owner, captor) {
  * ------------------------------------------------------------------ */
 // 多位人類玩家共用一台裝置時，顯示私人資訊前先請其他人迴避
 // 單機多人共用一台裝置時，顯示私人資訊前先請其他人迴避（連線版不需要）
-async function handoff(p) { if (!p.ai) await UI.handoff(p); }
+async function handoff(p) { if (!p.ai) { await waitRead(); await UI.handoff(p); } }
 function rememberText(p, opp) {
   const kn = known(p, opp);
   return `${pname(opp)} 的主帥 <span class="mini">${cimg(opp.commander, 'mini')}</span>${opp.cards.includes(opp.commander) ? '' : '（不在手中）'}・手牌 ${opp.cards.length} 張`
@@ -341,7 +360,7 @@ async function humanPick(p, role, kind, opp, i) {
   const body = `<p>${role === 'atk' ? '⚔ 你是攻方' : '🛡 你是守方'}——在 ${tname(i)} 與 ${pname(opp)} 進行<b>${kind === 'duel' ? '武將單挑' : '攻城戰'}</b>。
       每次只出<b>一張牌</b>：派一名武將（以${role === 'atk' ? '攻擊力' : '防禦力'}對抗敵方${role === 'atk' ? '防禦力' : '攻擊力'}），或改用一張特別卡。</p>
     <p><small>${rememberText(p, opp)}</small></p>
-    <b>武將</b>（滑鼠移到牌上可看數值；主帥若失去須以 ${fmt(RANSOM)} 贖回）
+    <b>武將</b>（${HINT.card}；主帥若失去須以 ${fmt(RANSOM)} 贖回）
     <div class="cards">${gens.map(id => `<label class="copt"><input type="radio" name="c" value="${id}" ${id === best ? 'checked' : ''}>${cimg(id)}${id === p.commander ? '<span class="cmdbadge">★主帥</span>' : ''}</label>`).join('')}</div>
     ${specs.length ? `<b>或改用特別卡</b><div class="cards">${specs.map(id => `<label class="copt"><input type="radio" name="c" value="${id}">${cimg(id)}</label>`).join('')}</div>
     <small>${[...new Set(specs.map(id => card(id).kind))].map(k => `<b>${KIND_LABEL[k]}</b>：${KIND_HELP[k]}`).join('<br>')}</small>` : ''}`;
@@ -875,7 +894,7 @@ async function move(p, steps, doublePass = false) {
       const amt = S.passStart * (doublePass ? 2 : 1);
       p.cash += amt; log(`${pname(p)} 經過起點，向國庫支領 ${fmt(amt)} 軍費。`);
     }
-    render(); await sleep(110);
+    render(); await sleep(p.ai ? S.stepMs : 110); // 電腦逐格前進的速度可由 opts.stepMs 調整
   }
   if (p.pos === 0 && steps > 0) { p.cash += S.passStart * 2; log(`${pname(p)} 停留起點，加倍領取 ${fmt(S.passStart * 2)} 軍費！`); render(); }
 }
@@ -897,6 +916,7 @@ async function showHand(p) {
 // 人類回合：等待擲骰，期間可使用錦囊、變賣資產、查看手牌。回傳 true 表示已用金蟬脫殼移動
 async function humanTurn(p) {
   for (;;) {
+    await waitRead();
     const act = await UI.turn(p, { reserve: turnReserves(p).length > 0 });
     if (act === 'roll') return false;
     if (act === 'reserve') { const moved = await humanReserveMenu(p); render(); if (moved || !p.alive || G.over) return true; }
@@ -914,7 +934,7 @@ async function turn(p) {
 function checkWin() {
   if (G.over) return;
   const al = alive();
-  if (al.length === 0) { G.over = true; UI.gameOver(null, '所有人都失敗了！'); return; }
+  if (al.length === 0) { G.over = true; waitRead().then(() => UI.gameOver(null, '所有人都失敗了！')); return; }
   let w = null, why = '';
   if (al.length === 1) { w = al[0]; why = '其他所有對手全部失敗，流落街頭或成為俘虜，成為統一中國之霸主！'; }
   else for (const p of al) {
@@ -926,7 +946,8 @@ function checkWin() {
     G.over = true;
     log(`🏆 ${pname(w)} 獲勝：${why}`);
     render();
-    UI.gameOver(w, `<p style="font-size:20px">${pname(w)} 獲勝：${why}</p><p>勝利者可向每人提出一個要求，他人不得拒絕。若有不服氣者，可以重新再戰，討回面子！</p>`);
+    const html = `<p style="font-size:20px">${pname(w)} 獲勝：${why}</p><p>勝利者可向每人提出一個要求，他人不得拒絕。若有不服氣者，可以重新再戰，討回面子！</p>`;
+    waitRead().then(() => UI.gameOver(w, html));
   }
 }
 async function gameLoop() {
@@ -941,12 +962,16 @@ async function gameLoop() {
 
 /* ------------------------------------------------------------------ *
  *  建立新局
- *  seats: [{ ai: 是否電腦, cmd: 主帥牌 id（0–3）}]；opts: { aiDelay, theme }（佔有領地 20 處獲勝為固定規則）
+ *  seats: [{ ai: 是否電腦, cmd: 主帥牌 id（0–3）}]；opts: { aiDelay, stepMs, readMs, theme, hints }（佔有領地 20 處獲勝為固定規則）
  * ------------------------------------------------------------------ */
 function newGame(seats, opts, ui) {
   UI = ui;
   applyTheme(opts.theme || 'sanguo');
+  HINT = { ...HINT_BASE, ...(opts.hints || {}) };
   if (opts.aiDelay != null) S.aiDelay = opts.aiDelay;
+  S.stepMs = opts.stepMs || 110;
+  S.readMs = opts.readMs || 0;
+  readUntil = 0; readSkip = null;
   const chosen = seats.map(r => r.cmd);
   G = {
     // 主帥全場公開；玩家即以主帥稱呼，旗幟與印章使用主帥姓氏
@@ -958,7 +983,7 @@ function newGame(seats, opts, ui) {
   };
   G.mem = G.players.map(() => G.players.map(() => new Set()));
   for (const p of G.players) drawFromPile(p, 3); // 每名參加者選定主帥後再抽三張牌
-  log(`遊戲開始！每位君主有軍費 ${fmt(S.startCash)}、兵力 ${S.startTroops} 名、主帥一名及撲克牌三張。滑鼠移到格子上可查看領地資訊。`);
+  log(`遊戲開始！每位君主有軍費 ${fmt(S.startCash)}、兵力 ${S.startTroops} 名、主帥一名及撲克牌三張。${HINT.tile}。`);
   return G;
 }
 
@@ -986,6 +1011,8 @@ return {
   S, TILES, GROUPS, CITY_TOLL, FIELD_TOLL, BUILD_COST, SIEGE_NEED, LEVEL_NAME, DEF_TROOPS, HIRE_COST, RANSOM, SALE_TAX,
   GEN_BASE, SPECIAL_BASE, POKER, SUIT, CARDS, KIND_LABEL, KIND_HELP, PLAYER_COLORS, DIE,
   fmt, esc, isProp, newGame, viewFor, gameLoop, state: () => G,
-  THEMES, applyTheme, theme: () => themeKey, sName, sDesc, tn,
+  THEMES, applyTheme, theme: () => themeKey, sName, sDesc, tn, skipReading,
+  // 速度設定（aiDelay）對應的逐格速度與每條消息停留時間：慢 5 秒、中 3 秒、快 2 秒
+  PACE: { 900: { stepMs: 380, readMs: 5000 }, 450: { stepMs: 260, readMs: 3000 }, 120: { stepMs: 150, readMs: 2000 } },
 };
 });

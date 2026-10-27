@@ -6,6 +6,7 @@
  *   連線（由 server/server.js 提供網頁）：引擎在伺服器執行，本頁只收畫面與題目、送回作答。 */
 (() => {
 const E = window.SanguoEngine;
+const TX = window.SanguoTexts; // 共用說明文字（texts.js）
 const { S, TILES, GROUPS, CITY_TOLL, FIELD_TOLL, BUILD_COST, LEVEL_NAME, DEF_TROOPS, HIRE_COST, RANSOM, SALE_TAX,
   GEN_BASE, SPECIAL_BASE, POKER, SUIT, CARDS, KIND_HELP, PLAYER_COLORS, DIE, fmt, esc, isProp } = E;
 const $ = s => document.querySelector(s);
@@ -23,7 +24,7 @@ function useTheme(key) {
   const th = E.applyTheme(key);
   window.setCardTheme?.(key);
   const img = $('#board img'); img.src = th.board; img.alt = th.label + '棋盤';
-  document.title = th.label;
+  document.title = `英雄擲天下｜${th.label}`;
   document.querySelectorAll('.themeTitle').forEach(el => { el.textContent = th.label; });
   document.querySelectorAll('.themeSub').forEach(el => { el.textContent = th.sub; });
 }
@@ -130,11 +131,47 @@ function flashDeck(k) {
   d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash');
 }
 function showDice(r) { const d = $('#dice'); if (d) d.textContent = r.map(x => DIE[x]).join(' '); }
-function addLog(html) {
+function appendLog(html) {
   const d = document.createElement('div'); d.innerHTML = html;
   const L = $('#log'); L.appendChild(d); L.scrollTop = L.scrollHeight;
   $('#msg').innerHTML = html;
 }
+
+/* ---- 動態消息：電腦的每個行動逐條顯示在棋盤中央 ----
+ * 停留時間由引擎決定（慢 5 秒、中 3 秒、快 2 秒）；meta = { dur, wait }：wait 毫秒後出現、停留 dur 毫秒。
+ * 戰報也在消息出現時才加入，順序與畫面一致。單機版點一下可跳過；連線版由伺服器控制節奏，不能跳過。 */
+const FEED = { items: [], timer: null, skippable: true, linger: 2500 };
+function addLog(html, meta) {
+  const now = Date.now(), it = { html, t0: now + (meta ? meta.wait : 0), dur: meta ? meta.dur : 0, logged: false };
+  FEED.items.push(it);
+  while (FEED.items.length > 12 && FEED.items[0].logged && now > FEED.items[0].t0 + FEED.items[0].dur) FEED.items.shift();
+  feedTick();
+}
+function feedTick() {
+  const now = Date.now();
+  for (const it of FEED.items) if (!it.logged && it.t0 <= now) { it.logged = true; appendLog(it.html); }
+  const shown = FEED.items.filter(it => it.logged), last = FEED.items[FEED.items.length - 1];
+  const el = $('#feed');
+  const visible = el && shown.length && last && now <= last.t0 + last.dur + FEED.linger && shown.some(it => it.dur);
+  if (!visible) { if (el) el.hidden = true; if (!FEED.items.some(it => !it.logged)) { clearInterval(FEED.timer); FEED.timer = null; } else ensureFeedTimer(); return; }
+  const reading = FEED.items.find(it => it.logged && now < it.t0 + it.dur);
+  const cur = VIEW && VIEW.cur != null ? P(VIEW.cur) : null;
+  el.style.borderColor = cur ? cur.color : '#d9a514';
+  const recent = shown.slice(-3), newest = recent.pop();
+  el.innerHTML = recent.map(it => `<div class="feed-old">${it.html}</div>`).join('') + `<div class="feed-new">${newest.html}</div>`
+    + (reading ? `<div class="feed-foot"><span class="feed-bar"><i style="width:${Math.min(100, (now - reading.t0) / Math.max(1, reading.dur) * 100)}%;background:${cur ? cur.color : '#d9a514'}"></i></span>${FEED.skippable ? '<span class="feed-skip">點一下跳過</span>' : ''}</div>` : '');
+  el.hidden = false;
+  ensureFeedTimer();
+}
+function ensureFeedTimer() { if (!FEED.timer) FEED.timer = setInterval(feedTick, 100); }
+function feedSkip() {
+  if (!FEED.skippable) return;
+  E.skipReading();
+  const now = Date.now();
+  FEED.items.forEach(it => { if (it.t0 > now) it.t0 = now; it.dur = Math.max(0, Math.min(it.dur, now - it.t0)); });
+  feedTick();
+}
+function feedReset(skippable) { FEED.items = []; FEED.skippable = skippable; feedTick(); }
 
 function renderView(v) {
   VIEW = v;
@@ -177,22 +214,11 @@ function renderView(v) {
   hydrate($('#players'));
 }
 
-const SPACE_HELP = {
-  start: () => `經過起點可向國庫支領 ${fmt(S.passStart)} 軍費，停留起點時加倍領取。`,
-  recruit: () => '可在此自由徵兵，每名士兵一兩，徵兵數量不限。',
-  hire: () => `每次以 ${fmt(HIRE_COST)} 取得一名武將，一律從在野武將中抽選，不得自由選取。`,
-  emergency: T => `抽取${T.n}卡一張，並依照指示辦理。`,
-  strategy: T => `抽取${T.n}卡一張，並依照指示辦理。保留卡可留待日後使用，限用一次。`,
-  shop: T => `${T.n}消費 ${fmt(T.fee)}。`,
-  rest: T => `繳 ${fmt(T.fee)} 休息一次，其間不得向他人收取過路稅（可進行防禦戰鬥）。`,
-  island: () => '重擲一次骰子，向國庫領取擲出點數 ×1000 兩之軍費。',
-  cottage: () => '重擲三次骰子，合計 10–12 點免費得武將 1 名，13–15 點 2 名，16–18 點 3 名。',
-};
 const levelName = i => TILES[i].t === 'field' ? '古戰場' : LEVEL_NAME[VIEW.tiles[i].level];
 // 領地懸停資訊：價格、稅金、地主
 function tileTipHtml(i) {
   const T = TILES[i], t = VIEW.tiles[i];
-  if (!isProp(i)) return `<b>${T.n}</b><div>${SPACE_HELP[T.t]?.(T) ?? ''}</div>`;
+  if (!isProp(i)) return `<b>${T.n}</b><div>${TX.spaceHelp(E, T)}</div>`;
   const o = t.owner != null ? P(t.owner) : null;
   const tolls = T.t === 'field' ? FIELD_TOLL.map((v, k) => `${'一二三四五'[k]}座 ${v}`).join('、') : CITY_TOLL[T.p].map((v, k) => `${LEVEL_NAME[k]} ${v}`).join('、');
   return `<b>${T.n}</b>　<small>${GROUPS[T.g]}</small><div>領地價格 ${fmt(T.p)}${T.t === 'city' ? `・建城費用 ${fmt(BUILD_COST)}` : ''}</div>`
@@ -201,20 +227,8 @@ function tileTipHtml(i) {
 }
 function tileInfo(i) {
   if (!VIEW || !$('#modal').hidden) return;
-  const T = TILES[i], t = VIEW.tiles[i];
-  let body = `<p>${SPACE_HELP[T.t]?.(T) ?? ''}</p>`;
-  if (isProp(i)) {
-    const tolls = T.t === 'field'
-      ? FIELD_TOLL.map((v, k) => `<tr><td>${'一二三四五'[k]}座古戰場</td><td>${fmt(v)}</td></tr>`).join('')
-      : `<tr><td>建城費用</td><td>${fmt(BUILD_COST)}</td></tr>` + CITY_TOLL[T.p].map((v, k) => `<tr><td>${LEVEL_NAME[k]}稅金</td><td>${fmt(v)}</td></tr>`).join('');
-    body = `<h4 style="margin:0 0 6px">${T.n}　領地所有證</h4><table>
-      <tr><td>顏色</td><td>${GROUPS[T.g]}</td></tr><tr><td>領地價格</td><td>${fmt(T.p)}</td></tr>${tolls}
-      <tr><td>主權</td><td>${t.owner == null ? '無（國庫所有）' : pname(P(t.owner))}</td></tr>
-      <tr><td>現況</td><td>${t.owner == null ? '空白領地' : levelName(i)}</td></tr>
-      <tr><td>目前過路稅</td><td>${t.owner == null ? '—' : fmt(t.toll)}</td></tr>
-      <tr><td>攻城所需兵力</td><td>${T.t === 'field' ? 1000 : E.SIEGE_NEED[t.level]} 名</td></tr></table>
-      <p><small>★凡擁有同色之全部領地者，過路稅金依上表加倍收取。${T.t === 'field' ? '古戰場不得建設城池。' : ''}</small></p>`;
-  }
+  const T = TILES[i];
+  const body = TX.tileInfoHtml(E, i, VIEW, pname, levelName);
   okLocal(T.n, body);
 }
 window.zoomCard = id => {
@@ -249,20 +263,7 @@ function turnButtons(opts, onPick) {
 }
 
 function showRules() {
-  okLocal('遊戲說明書', `<ol style="padding-left:20px;line-height:1.6">
-  <li><b>準備</b>：每位參加者領取軍費 ${fmt(S.startCash)}、兵力 ${S.startTroops} 名，自由選取主帥（四張 A）一名後再抽選三張武將撲克牌。主帥全場公開，各人其餘手牌不公開。棋盤上以寫有主帥姓氏的旗幟代表各人位置，購得的領地蓋上主帥姓氏印章。</li>
-  <li><b>開始</b>：依照順序擲骰子前進。經由起點可向國庫支領 ${fmt(S.passStart)} 軍費，停留起點時加倍領取。</li>
-  <li><b>空白領地</b>：依定價自由向國庫購買。<b>自軍領地</b>：繳交建城費用 ${fmt(BUILD_COST)} 建設城池，領地可建小城，小城可改建大城。<b>古戰場</b>：規定與領地相同，但不得建設城池，稅金依地主擁有古戰場座數計算。凡擁有同色之全部領地者，過路稅金加倍收取。</li>
-  <li><b>他人領地</b>：繳交過路稅，或進行<b>武將單挑</b>（免交過路稅），或進行<b>攻城戰</b>（佔領敵城）。
-    <ul><li><b>武將單挑</b>：雙方各派一名武將，以攻方武將攻擊力對抗守方武將防禦力，力量大者為勝，並可俘虜敗方武將；平手則同歸於盡，繳回國庫。守方可自由選擇是否出戰，不論勝負，該次過路稅守方不得收取。</li>
-    <li><b>攻城戰</b>：攻領地需 500 兵、攻小城或古戰場需 1000 兵、攻大城需 1500 兵；守方需 ${DEF_TROOPS} 兵。守方兵力不足或不願出戰時，領地棄守。不論勝負，攻方損失所派兵力、守方損失 ${DEF_TROOPS} 兵。勝者擁有領地主權並俘虜敗方武將；平手時武將同歸於盡，領地主權仍為守方所有。</li></ul></li>
-  <li><b>出戰一張牌</b>：單挑或攻城時，雙方各出一張牌——一名武將，或以一張特別卡取代武將（限用一次）。武器卡（Q）——雙方出戰之牌同歸於盡，平手；陣式卡（K）——俘虜敵方出戰之武將並獲勝，雙方都用陣式則抵消；霸王卡（鬼牌）——獲勝，並將敵方所出之牌、攻城損失之士兵及領地占為己有，雙方同時使用則平手。</li>
-  <li><b>主帥</b>：被敵人俘虜或同歸於盡時，需以 ${fmt(RANSOM)} 向敵軍或國庫贖回；無軍費贖回時即為失敗，該主帥成為一般武將。</li>
-  <li><b>${tn('recruit')}</b>每名士兵一兩・<b>${tn('hire')}</b>每次 ${fmt(HIRE_COST)} 抽一名在野武將・<b>${tn('shop')}</b>依標示消費・<b>${TILES.filter(T => T.t === 'rest').map(T => T.n).join('／')}</b>繳 500／800 兩休息一次，其間不得收取過路稅・<b>${tn('island')}</b>重擲骰子，領取點數 ×1000 兩・<b>${tn('cottage')}</b>重擲三次骰子，10–12 點得武將 1 名、13–15 點 2 名、16–18 點 3 名・<b>${tn('emergency')}／${tn('strategy')}</b>抽牌並依指示辦理，錦囊保留卡可留待日後使用。</li>
-  <li><b>記憶</b>：玩家看不到別人的牌，只會記得公開被俘虜或被奪走的牌；但對方一出牌，這些記憶就失效。</li>
-  <li><b>賣出</b>：軍費不足時，可隨時賣出武將、特別卡、士兵（每 500 名換 500 兩）或領地（地價加建城費）給國庫，每次賣出需繳 ${fmt(SALE_TAX)} 交易稅。</li>
-  <li><b>勝利</b>：其他所有對手全部失敗；或佔有同色全部之領地（含古戰場）任一種；或佔有領地總數達 ${S.winTerr} 處。</li></ol>
-  <p><small>自訂規則（原版未載明）：武將賣價 ${fmt(GEN_BASE)}、特別卡賣價 ${fmt(SPECIAL_BASE)}；其他債務無力支付時亦視為破產；賣出僅限賣給國庫，暫不支援玩家間拍賣。</small></p>`);
+  okLocal('遊戲說明書', TX.rulesHtml(E));
 }
 const showGame = () => { $('#setup').hidden = true; $('#lobby').hidden = true; $('#game').hidden = false; };
 
@@ -288,7 +289,8 @@ function startOffline(seats, opts) {
     gameOver: (w, html) => { ui.render(); localModal(w ? '🏆 勝利' : '遊戲結束', html, [{ label: '再戰一局', cls: 'pri', value: true }]).then(() => location.reload()); },
   };
   showGame();
-  E.newGame(seats, opts, ui);
+  feedReset(true);
+  E.newGame(seats, { ...opts, ...(E.PACE[opts.aiDelay] || E.PACE[450]) }, ui);
   ui.render();
   E.gameLoop();
 }
@@ -326,9 +328,9 @@ function connect() {
   es.onmessage = ev => {
     const m = JSON.parse(ev.data);
     if (m.type === 'lobby') { ON.lobby = m.lobby; ON.you = m.you; if (!m.lobby.started) renderLobby(); }
-    else if (m.type === 'reset') { $('#log').innerHTML = ''; VIEW = null; $('#game').hidden = true; renderLobby(); }
+    else if (m.type === 'reset') { feedReset(false); $('#log').innerHTML = ''; VIEW = null; $('#game').hidden = true; renderLobby(); }
     else if (m.type === 'view') { showGame(); renderView(m.view); }
-    else if (m.type === 'log') addLog(m.html);
+    else if (m.type === 'log') addLog(m.html, m.meta);
     else if (m.type === 'dice') showDice(m.r);
     else if (m.type === 'flash') flashDeck(m.k);
     else if (m.type === 'turn') turnButtons(m.opts, act => api('/api/answer', { id: m.id, btn: act }));
@@ -388,6 +390,7 @@ function renderLobby() {
   });
 }
 function startOnline() {
+  FEED.skippable = false; // 連線版：節奏由伺服器控制
   $('#setup').hidden = true; $('#lobby').hidden = false;
   $('#onTheme').innerHTML = themeOptions();
   $('#onTheme').onchange = () => api('/api/lobby', { op: 'theme', theme: $('#onTheme').value });
@@ -397,6 +400,7 @@ function startOnline() {
 
 /* ---- 啟動 ---- */
 $('#rulesBtn0').onclick = showRules;
+$('#feed').onclick = feedSkip;
 $('#rulesBtn').onclick = showRules;
 $('#rulesBtn1').onclick = showRules;
 if (location.protocol === 'http:' || location.protocol === 'https:') startOnline();

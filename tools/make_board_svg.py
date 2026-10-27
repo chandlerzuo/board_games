@@ -57,11 +57,18 @@ assert len(TILES) == len(BOXES) == 55
 COL = {'orange': '#ef5a28', 'blue': '#2f7fd8', 'yellow': '#f6d43a', 'green': '#3aa655', 'magenta': '#d8345f', 'field': '#a0452a'}
 FONT = "'PingFang TC','Heiti TC','Microsoft JhengHei','Noto Sans TC',sans-serif"
 
-# 橫式棋盤：把直式掃描座標逆時針轉 90 度（起點移到左上角）
+# 橫式棋盤（電腦版）：把直式掃描座標逆時針轉 90 度（起點移到左上角）
+# 直式棋盤（手機版）：保留原版掃描的直式方向，由 main(portrait=True) 切換
+PORTRAIT = False
+# 手機版：直式，格內文字放大（在手機寬度下不小於約 12pt），商店不畫品牌標誌，圖畫格加名稱橫幅
+MOBILE = False
+MOBILE_MIN = 64   # 手機版主要文字的最小字級（棋盤單位；棋盤寬 1900 縮到 360pt 時約 12pt）
 OUT_W, OUT_H = H, W
 
 def rot(x, y, w, h):
     cx, cy = x - SCAN_X, y - SCAN_Y
+    if PORTRAIT:
+        return cx, cy, w, h
     return cy, W - cx - w, h, w
 
 def box(i):
@@ -288,6 +295,9 @@ def TX(x, y, s, size, fill, stroke='#fff', sw=5, font='', extra=''):
     return f'<text x="{x:.0f}" y="{y:.0f}" font-size="{size:.0f}" fill="{fill}" font-weight="900" text-anchor="middle" stroke="{stroke}" stroke-width="{sw}" paint-order="stroke" stroke-linejoin="round"{ff} {extra}>{s}</text>'
 def place(i, W0, H0, inner):
     x, y, w, h = box(i)
+    if PORTRAIT:  # 圖畫依橫式格子比例繪製；直式格子改用等比縮放並置中，避免變形
+        k = min(w / W0, h / H0)
+        return f'<g transform="translate({x + (w - W0 * k) / 2:.1f},{y + (h - H0 * k) / 2:.1f}) scale({k:.4f})">{inner}</g>'
     return f'<g transform="translate({x},{y}) scale({w / W0:.4f},{h / H0:.4f})">{inner}</g>'
 def star4(cx, cy, r, c='#fff'):
     return f'<path d="M{cx},{cy - r} Q{cx + r * .18},{cy - r * .18} {cx + r},{cy} Q{cx + r * .18},{cy + r * .18} {cx},{cy + r} Q{cx - r * .18},{cy + r * .18} {cx - r},{cy} Q{cx - r * .18},{cy - r * .18} {cx},{cy - r}z" fill="{c}"/>'
@@ -583,7 +593,7 @@ def park(i):
         o += P(f'M{px - 6},{358} l2,-16 h8 l2,16z', c, 1.8) + EL(px, 336, 6, 6, 'url(#gSkin)', 1.6) + P(f'M{px - 6},{335} q6,-10 12,0z', hc, 1.2)
     o += P('M276,326 q-4,-20 4,-32', 'none', 1, '#555') + EL(280, 290, 5, 6, '#e84393', 1.2)
     # 名稱
-    for k, ch in enumerate(nm(i)):
+    for k, ch in enumerate(nm(i) if not MOBILE else ''):
         o += TX(W0 * 0.07, H0 * (0.6 + k * 0.1), ch, H0 * 0.09, '#1f5fbf', '#fff', 6)
     return place(i, W0, H0, o)
 
@@ -606,8 +616,9 @@ def parlor(i):
         for bx_ in (56, 434):
             o += EL(bx_, by_, 4, 4, bulbs[by_ % 5], 1.2)
     _pn = nm(i); _ps = min(33, 165 / max(1, len(_pn)))
-    o += TX(245, 58, _pn, _ps, '#fff', '#c0392b', 6)
-    o += TX(245, 58, _pn, _ps, '#fff', '#fff', 0)
+    if not MOBILE:
+        o += TX(245, 58, _pn, _ps, '#fff', '#c0392b', 6)
+        o += TX(245, 58, _pn, _ps, '#fff', '#fff', 0)
     # 屋脊寶珠
     o += P('M245,78 q-12,10 -6,22 q-10,-2 -14,8 q10,0 12,6 q8,8 16,0 q2,-6 12,-6 q-4,-10 -14,-8 q6,-12 -6,-22z', 'url(#gFireP)', 1.5)
     o += EL(245, 102, 17, 17, 'url(#gLantern)', 2.5) + EL(245, 102, 13, 13, 'none', 1.5, '#f6c90e')
@@ -753,7 +764,7 @@ def island(i):
     o += P('M228,330 l14,-4 l4,4 l-4,4z M264,330 l-14,-4 l-4,4 l4,4z', '#8b6914', 1)
     o += TX(246, 310, '北', 9, '#8b3a1a', '#fff', 0)
     # 名稱
-    _in = nm(i); _step = min(0.2, 0.74 / max(1, len(_in))); _top = 0.5 - _step * (len(_in) - 1) / 2
+    _in = nm(i) if not MOBILE else ''; _step = min(0.2, 0.74 / max(1, len(_in))); _top = 0.5 - _step * (len(_in) - 1) / 2
     for k, ch in enumerate(_in):
         o += TX(W0 * 0.82, H0 * (_top + k * _step), ch, H0 * 0.17, 'url(#gGoldText)', '#7a3a0a', 7)
         o += TX(W0 * 0.82, H0 * (_top + k * _step), ch, H0 * 0.17, 'url(#gGoldText)', '#fff3b0', 1.5)
@@ -840,7 +851,8 @@ def cottage(i):
     # 飛鳥
     o += P('M130,30 q5,-6 10,0 q5,-6 10,0 M160,46 q4,-5 8,0 q4,-5 8,0', 'none', 2)
     # 題字與印章
-    o += TX(W0 * 0.86, H0 * 0.95, nm(i), min(H0 * 0.11, W0 * 0.26 / max(1, len(nm(i)))), '#1a1a1a', '#fff8e1', 5, "'Kaiti TC','STKaiti','BiauKai','DFKai-SB',serif")
+    if not MOBILE:
+        o += TX(W0 * 0.86, H0 * 0.95, nm(i), min(H0 * 0.11, W0 * 0.26 / max(1, len(nm(i)))), '#1a1a1a', '#fff8e1', 5, "'Kaiti TC','STKaiti','BiauKai','DFKai-SB',serif")
     return place(i, W0, H0, o)
 
 def arrows():
@@ -889,9 +901,98 @@ def decks():
                 out += t(x + w * 0.2, y + h * 0.22 + n * h * 0.2, ch, h * 0.17)
     return out
 
-def main(theme='sanguo'):
-    global NAMES
+# ---------------- 手機版格子 ----------------
+MIN_SEEN = []   # 記錄手機版用到的字級，供檢查
+
+def mlabel(x, y, w, h, s_, fill='#111', stroke=None, weight=900, pad=0.88):
+    """在方框內以最大字級寫字：自動選擇單行、直書、兩行或兩直行"""
+    n = len(s_)
+    half = (n + 1) // 2
+    cands = [('row', min(h * 0.78, w * pad / n)), ('col', min(w * 0.78, h * pad / n))]
+    if n >= 3:
+        # 兩直行（由右而左）較不直覺，只在明顯較大時才採用
+        cands += [('rows2', min(h * pad / 2.15, w * pad / half)), ('cols2', 0.85 * min(w * pad / 2.15, h * pad / half))]
+    if s_.isdigit():
+        cands = [('row', min(h * 0.8, w * pad / (n * 0.6)))]
+    mode, fs = max(cands, key=lambda c: c[1])
+    MIN_SEEN.append((fs, s_))
+    ex = f'stroke="{stroke}" stroke-width="{fs * 0.08:.1f}" paint-order="stroke"' if stroke else ''
+    cx, cy = x + w / 2, y + h / 2
+    out = ''
+    if mode == 'row':
+        out += t(cx, cy + fs * 0.36, s_, fs, fill, weight, extra=ex)
+    elif mode == 'col':
+        for k, ch in enumerate(s_):
+            out += t(cx, cy - fs * n / 2 + fs * (k + 0.86), ch, fs, fill, weight, extra=ex)
+    elif mode == 'rows2':
+        for r, part in enumerate((s_[:half], s_[half:])):
+            out += t(cx, cy + (r - 0.5) * fs * 1.08 + fs * 0.36, part, fs, fill, weight, extra=ex)
+    else:  # 兩直行，由右而左
+        for c, part in enumerate((s_[:half], s_[half:])):
+            xx = cx + (0.5 - c) * fs * 1.08
+            for k, ch in enumerate(part):
+                out += t(xx, cy - fs * half / 2 + fs * (k + 0.86), ch, fs, fill, weight, extra=ex)
+    return out
+
+def m_small(i, kind):
+    x, y, w, h = box(i)
+    name = nm(i)
+    if kind in ('emergency', 'strategy'):
+        inner = '#e8457a' if kind == 'emergency' else '#ffe14d'
+        out = frame(x, y, w, h, '#2f7fd8')
+        out += f'<rect x="{x + 12}" y="{y + 12}" width="{w - 24}" height="{h - 24}" rx="5" fill="{inner}" stroke="#1a1a1a" stroke-width="3"/>'
+        m = min(w, h)
+        out += f'<g opacity=".22">{picture("horse" if kind == "emergency" else "pouch", x + w / 2, y + h / 2, m * 0.8)}</g>'
+        short = name[-2:] if len(name) == 4 else name   # 緊急軍情 → 軍情、智取妙計 → 妙計
+        return out + mlabel(x + 14, y + 14, w - 28, h - 28, short, '#fff' if kind == 'emergency' else '#1a1a1a',
+                            '#1a1a1a' if kind == 'emergency' else None)
+    bg, ink, icon = {'recruit': ('#f6d43a', '#1a1a1a', 'soldiers'), 'hire': ('#6b5bd6', '#fff', 'people')}[kind]
+    if len(name) > 3:
+        name = name[-3:]   # 職業介紹所 → 介紹所
+    out = frame(x, y, w, h, bg, '#c9c1ff' if kind == 'hire' else None)
+    # 先試「名稱 + 小圖示」；名稱太長放不下大字時，只寫名稱
+    split = 0.62
+    test = mlabel(x + 8, y + 8, w - 16, (h - 16) * split, name)
+    fs_top = MIN_SEEN.pop()[0]
+    if fs_top >= MOBILE_MIN and h - 16 - (h - 16) * split >= 44:
+        out += mlabel(x + 8, y + 8, w - 16, (h - 16) * split, name, ink)
+        ih = (h - 16) * (1 - split)
+        out += f'<rect x="{x + w / 2 - ih * 0.62:.0f}" y="{y + 8 + (h - 16) * split:.0f}" width="{ih * 1.24:.0f}" height="{ih * 0.92:.0f}" rx="6" fill="#111"/>' if kind == 'recruit' else ''
+        out += picture(icon, x + w / 2, y + 8 + (h - 16) * split + ih * 0.46, ih * 0.86)
+    else:
+        out += mlabel(x + 8, y + 8, w - 16, h - 16, name, ink)
+    return out
+
+def m_shop(i, fee):
+    x, y, w, h = box(i)
+    out = frame(x, y, w, h, '#f6d43a', '#b8860b')
+    k = 0.5   # 上名稱、下金額
+    name = nm(i)[:2]   # 商店街 → 商店
+    out += mlabel(x + 8, y + 8, w - 16, (h - 16) * k, name)
+    out += mlabel(x + 8, y + 8 + (h - 16) * k, w - 16, (h - 16) * (1 - k), str(fee), '#c0392b')
+    return out
+
+def m_field(i):
+    x, y, w, h = box(i)
+    out = frame(x, y, w, h, COL['field'], '#f3c9a9')
+    return out + mlabel(x + 10, y + 10, w - 20, h - 20, nm(i), '#fff', '#3a1206')
+
+def m_ribbon(i):
+    """圖畫格（休息處、寶島、茅廬）下方的名稱橫幅"""
+    x, y, w, h = box(i)
+    rh = max(MOBILE_MIN * 1.25, h * 0.24)
+    ry = y + h - rh
+    out = f'<rect x="{x + 6}" y="{ry:.0f}" width="{w - 12}" height="{rh:.0f}" rx="10" fill="#7a1f1f" stroke="#1a1a1a" stroke-width="3" fill-opacity=".92"/>'
+    return out + mlabel(x + 12, ry + 4, w - 24, rh - 8, nm(i), '#fff3b0')
+
+def main(theme='sanguo', portrait=False, out=None, mobile=False):
+    global NAMES, PORTRAIT, OUT_W, OUT_H, MOBILE
     NAMES = THEME_NAMES[theme]
+    MOBILE = mobile
+    PORTRAIT = portrait or mobile
+    portrait = PORTRAIT
+    MIN_SEEN.clear()
+    OUT_W, OUT_H = (W, H) if portrait else (H, W)
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {OUT_W} {OUT_H}" font-family="{FONT}">',
              f'<defs>{DEFS}</defs>',
              f'<rect width="{OUT_W}" height="{OUT_H}" fill="#fbf3a6"/><rect width="{OUT_W}" height="{OUT_H}" fill="url(#dots)"/>',
@@ -900,6 +1001,9 @@ def main(theme='sanguo'):
     for i, tile in enumerate(TILES):
         kind = tile[0]
         if kind == 'city': parts.append(city(i, nm(i), tile[2], tile[3]))
+        elif MOBILE and kind == 'field': parts.append(m_field(i))
+        elif MOBILE and kind == 'shop': parts.append(m_shop(i, tile[2]))
+        elif MOBILE and kind in ('recruit', 'hire', 'emergency', 'strategy'): parts.append(m_small(i, kind))
         elif kind == 'field': parts.append(field(i, nm(i)))
         elif kind == 'shop': parts.append(shop(i, tile[2], tile[3]))
         elif kind == 'start': parts.append(start(i))
@@ -907,8 +1011,9 @@ def main(theme='sanguo'):
         elif kind == 'island': parts.append(island(i))
         elif kind == 'cottage': parts.append(cottage(i))
         else: parts.append(small(i, kind))
+        if MOBILE and kind in ('rest', 'island', 'cottage'): parts.append(m_ribbon(i))
     parts.append('</svg>')
-    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'board-%s.svg' % theme)
+    out = out or os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'board-%s.svg' % theme)
     svg = '\n'.join(parts)
     # 縮短過長的小數，減少檔案大小
     svg = re.sub(r'(?<![\d.])(\d+\.\d{2,})', lambda m: ('%.1f' % float(m.group(1))).rstrip('0').rstrip('.'), svg)
@@ -917,5 +1022,11 @@ def main(theme='sanguo'):
     print('wrote', os.path.normpath(out), os.path.getsize(out), 'bytes')
 
 if __name__ == '__main__':
-    for _t in ('sanguo', 'shuihu'):
-        main(_t)
+    import sys
+    if len(sys.argv) == 3 and sys.argv[1] == '--mobile':
+        # 手機版直式棋盤：python3 tools/make_board_svg.py --mobile 輸出資料夾
+        for _t in ('sanguo', 'shuihu'):
+            main(_t, mobile=True, out=os.path.join(sys.argv[2], 'board-%s-mobile.svg' % _t))
+    else:
+        for _t in ('sanguo', 'shuihu'):
+            main(_t)

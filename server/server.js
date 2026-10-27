@@ -35,6 +35,7 @@ const FILES = {
   '/client.js': ['client.js', 'text/javascript; charset=utf-8'],
   '/cards.js': ['cards.js', 'text/javascript; charset=utf-8'],
   '/themes.js': ['themes.js', 'text/javascript; charset=utf-8'],
+  '/texts.js': ['texts.js', 'text/javascript; charset=utf-8'],
   '/theme-shuihu-art.js': ['theme-shuihu-art.js', 'text/javascript; charset=utf-8'],
   '/board-sanguo.svg': ['board-sanguo.svg', 'image/svg+xml'],
   '/board-shuihu.svg': ['board-shuihu.svg', 'image/svg+xml'],
@@ -82,7 +83,8 @@ const toSeat = (pid, msg) => clients.forEach(c => { if (pidOf(c.token) === pid) 
 const broadcast = msg => clients.forEach(c => send(c, msg));
 const netUI = {
   sleep: ms => new Promise(r => setTimeout(r, ms)),
-  log: html => { game.logs.push(html); if (game.logs.length > 400) game.logs.shift(); broadcast({ type: 'log', html }); },
+  // meta：電腦回合消息的停留時間（{ dur, wait }，毫秒），畫面據此逐條顯示
+  log: (html, meta) => { game.logs.push(html); if (game.logs.length > 400) game.logs.shift(); broadcast({ type: 'log', html, meta }); },
   render: () => { if (!renderQueued) { renderQueued = true; setImmediate(sendViews); } },
   dice: r => broadcast({ type: 'dice', r }),
   flash: k => broadcast({ type: 'flash', k }),
@@ -111,7 +113,7 @@ function startGame() {
   game = { seatOf: {}, pending: new Map(), logs: [], over: null };
   seated.forEach((x, pid) => { game.seatOf[x.k] = pid; });
   lobby.started = true;
-  E.newGame(seated.map(x => ({ ai: x.s.state === 'ai', cmd: x.s.cmd })), { aiDelay: lobby.speed, theme: lobby.theme }, netUI);
+  E.newGame(seated.map(x => ({ ai: x.s.state === 'ai', cmd: x.s.cmd })), { aiDelay: lobby.speed, ...E.PACE[lobby.speed], theme: lobby.theme }, netUI);
   broadcastLobby();
   sendViews();
   E.gameLoop().catch(err => { console.error('遊戲錯誤：', err); netUI.log('（伺服器錯誤，本局中止）'); });

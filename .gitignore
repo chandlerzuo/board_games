@@ -1,3 +1,9 @@
 .DS_Store
 node_modules/
 *.log
+# 由 tools/build_wechat.js 產生
+wechat/js/lib/
+wechat/js/data/
+wechat/images/
+tools/wechat-preview/bundle.js
+wechat/project.private.config.json

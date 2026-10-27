@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<title>三國風雲</title>
+<title>英雄擲天下</title>
 <style>
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -71,6 +71,16 @@
   .mini .cimg, .cimg.mini { width: 34px !important; display: inline-block !important; vertical-align: middle; box-shadow: 0 1px 2px #0005; }
   .cw { display: inline-block; }
   .cmdbadge { font-size: 11px; color: #8b1e1e; font-weight: 700; }
+  /* 動態消息：電腦行動逐條顯示在棋盤中央（牌堆位置，不擋格子） */
+  #feed { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 46%; z-index: 5; cursor: pointer;
+          background: rgba(251,243,220,.97); border: 3px solid #d9a514; border-radius: 1cqw; padding: .9cqw 1.3cqw;
+          box-shadow: 0 6px 20px #0007; font-size: clamp(15px, 1.8cqw, 24px); line-height: 1.5; }
+  #feed .feed-old { opacity: .6; font-size: .8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #feed .feed-new { font-size: 1.05em; margin-top: .2em; }
+  #feed .feed-foot { display: flex; align-items: center; gap: 10px; margin-top: .45em; }
+  #feed .feed-bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(0,0,0,.12); overflow: hidden; }
+  #feed .feed-bar i { display: block; height: 100%; }
+  #feed .feed-skip { font-size: .7em; color: #6b4f2a; }
   #tip { position: fixed; z-index: 100; pointer-events: none; background: #fffdf0; border: 2px solid #6b4f2a; border-radius: 8px; padding: 8px 10px; max-width: 260px; font-size: 13px; line-height: 1.5; box-shadow: 0 4px 14px #0006; }
   .tipstats { display: flex; gap: 12px; margin: 3px 0; font-size: 14px; }
   .tiphelp { margin-top: 4px; color: #7a2a12; }
@@ -119,7 +129,7 @@
   <fieldset>
     <legend>設定</legend>
     <div class="row">主題 <select id="optTheme"></select></div>
-    <div class="row">電腦速度 <select id="optSpeed"><option value="900">慢</option><option value="450" selected>中</option><option value="120">快</option></select></div>
+    <div class="row">電腦速度 <select id="optSpeed"><option value="900">慢（每步 5 秒）</option><option value="450" selected>中（每步 3 秒）</option><option value="120">快（每步 2 秒）</option></select></div>
   </fieldset>
   <div class="row" style="justify-content:space-between">
     <button id="rulesBtn0">遊戲說明</button>
@@ -135,14 +145,14 @@
   <fieldset><legend>座位</legend><div id="seatRows"></div><div id="lobbyWait" class="err" style="color:#6b4f2a"></div></fieldset>
   <fieldset id="lobbyHost" hidden><legend>房主設定</legend>
     <div class="row">主題 <select id="onTheme"></select></div>
-    <div class="row">電腦速度 <select id="onSpeed"><option value="900">慢</option><option value="450" selected>中</option><option value="120">快</option></select></div>
+    <div class="row">電腦速度 <select id="onSpeed"><option value="900">慢（每步 5 秒）</option><option value="450" selected>中（每步 3 秒）</option><option value="120">快（每步 2 秒）</option></select></div>
     <div class="row" style="justify-content:flex-end"><button id="lobbyStart" class="pri" style="font-size:20px;padding:10px 28px">開始遊戲</button></div>
   </fieldset>
   <div class="row"><button id="rulesBtn1">遊戲說明</button><span id="netStatus" class="err"></span></div>
 </div>
 
 <div id="game" hidden>
-  <div id="board"><img src="board-sanguo.svg" alt="三國風雲棋盤"></div>
+  <div id="board"><img src="board-sanguo.svg" alt="三國風雲棋盤"><div id="feed" hidden></div></div>
   <aside>
     <div style="display:flex;gap:8px"><button id="rulesBtn">遊戲說明</button></div>
     <div id="msg"></div>
@@ -158,6 +168,7 @@
 <script src="theme-shuihu-art.js"></script>
 <script src="themes.js"></script>
 <script src="engine.js"></script>
+<script src="texts.js"></script>
 <script src="client.js"></script>
 </body>
 </html>
