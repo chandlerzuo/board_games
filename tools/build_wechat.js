@@ -184,13 +184,13 @@ async function main() {
   const gj = path.join(OUT, 'game.json'), conf = JSON.parse(fs.readFileSync(gj, 'utf8'));
   conf.subpackages = THEMES.map(t => ({ name: t, root: `themes/${t}/` }));
   fs.writeFileSync(gj, JSON.stringify(conf, null, 2) + '\n');
-  fs.mkdirSync(path.join(OUT, 'js', 'data'), { recursive: true });
-  fs.writeFileSync(path.join(OUT, 'js', 'data', 'cardinfo.js'),
-    `'use strict';\n// 由 tools/build_wechat.js 產生：每個主題、每張牌的說明（HTML）\nmodule.exports = ${JSON.stringify(r.info)};\n`);
-  // 版本標記：建置時間，顯示在設定畫面最下方，方便確認手機上跑的是哪一版
+  // 版本標記（建置時間）一併寫入 cardinfo.js 的 BUILD，顯示在設定畫面最下方，方便確認手機上跑的是哪一版
   const d = new Date(), pad = n => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
-  fs.writeFileSync(path.join(OUT, 'js', 'data', 'version.js'), `'use strict';\n// 由 tools/build_wechat.js 產生\nmodule.exports = ${JSON.stringify(stamp)};\n`);
+  fs.mkdirSync(path.join(OUT, 'js', 'data'), { recursive: true });
+  fs.rmSync(path.join(OUT, 'js', 'data', 'version.js'), { force: true });
+  fs.writeFileSync(path.join(OUT, 'js', 'data', 'cardinfo.js'),
+    `'use strict';\n// 由 tools/build_wechat.js 產生：每個主題、每張牌的說明（HTML），以及建置版本 BUILD\nmodule.exports = ${JSON.stringify({ ...r.info, BUILD: stamp })};\n`);
   console.log('build', stamp);
   bundlePreview();
   // 主套件不得超過 4 MB，全部（含分包）不得超過 30 MB
