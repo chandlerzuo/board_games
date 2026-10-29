@@ -187,6 +187,11 @@ async function main() {
   fs.mkdirSync(path.join(OUT, 'js', 'data'), { recursive: true });
   fs.writeFileSync(path.join(OUT, 'js', 'data', 'cardinfo.js'),
     `'use strict';\n// 由 tools/build_wechat.js 產生：每個主題、每張牌的說明（HTML）\nmodule.exports = ${JSON.stringify(r.info)};\n`);
+  // 版本標記：建置時間，顯示在設定畫面最下方，方便確認手機上跑的是哪一版
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+  fs.writeFileSync(path.join(OUT, 'js', 'data', 'version.js'), `'use strict';\n// 由 tools/build_wechat.js 產生\nmodule.exports = ${JSON.stringify(stamp)};\n`);
+  console.log('build', stamp);
   bundlePreview();
   // 主套件不得超過 4 MB，全部（含分包）不得超過 30 MB
   const size = d => fs.readdirSync(d).reduce((a, f) => { const p = path.join(d, f), st = fs.statSync(p); return a + (st.isDirectory() ? size(p) : st.size); }, 0);

@@ -5,6 +5,7 @@ const E = require('./lib/engine.js');
 const TX = require('./lib/texts.js');
 const { makeForm } = require('./lib/form.js');
 const CARD_INFO = require('./data/cardinfo.js');
+const BUILD = require('./data/version.js');
 const { SIZE, COLOR, font, fillR, rrect, ellipsize, wrapText } = require('./gfx.js');
 const R = require('./rich.js');
 const { BoardView, BOXES, BW, BH } = require('./board.js');
@@ -323,6 +324,7 @@ function drawSetup() {
   ['健康遊戲忠告', '抵制不良遊戲，拒絕盜版遊戲。注意自我保護，謹防受騙上當。', '適度遊戲益腦，沉迷遊戲傷身。合理安排時間，享受健康生活。'].forEach(l => {
     wrapText(ctx, l, font(SIZE.tiny), cw).forEach(t => { ctx.fillText(t, W / 2, y + 8); y += 19; });
   });
+  ctx.fillStyle = 'rgba(107,79,42,.6)'; ctx.font = font(12); ctx.fillText(`版本 ${BUILD}`, W / 2, y + 10); y += 22;
   ctx.textAlign = 'left';
   y += 12 + safeBottom;
   const contentH = y - startY, viewH = H - (menu.bottom + 10);
