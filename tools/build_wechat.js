@@ -5,6 +5,8 @@
  *   2. 產生手機版直式棋盤（tools/make_board_svg.py --mobile），並轉成 JPG
  *   3. 把每個主題的 54 張牌畫成一張拼版 JPG，並匯出牌的說明文字（wechat/js/data/cardinfo.js）
  *   4. 產生瀏覽器預覽用的 tools/wechat-preview/bundle.js
+ * 主套件上限 4 MB，因此每個主題的棋盤與牌圖放在各自的分包 wechat/themes/<主題>/（選定主題時才下載），
+ * 主套件只放程式；分包清單寫入 game.json。
  * 圖片以本機的 Google Chrome（無頭模式）繪製。
  * 執行：node tools/build_wechat.js　（可用 CHROME=/path/to/chrome 指定瀏覽器） */
 const fs = require('fs');
@@ -14,7 +16,7 @@ const { spawn, execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'wechat');
-const THEMES = ['sanguo', 'shuihu'];
+const THEMES = require('../themes.js').order; // 所有主題
 const CELL = [240, 336], COLS = 9; // 與 wechat/js/main.js 相同
 const BOARD_PX = [1900, 2630];
 
@@ -95,9 +97,7 @@ async function render(boards) {
         const im = await __svgToImg(${JSON.stringify(boards[t])});
         const c = document.createElement('canvas'); c.width = ${BOARD_PX[0]}; c.height = ${BOARD_PX[1]};
         const g = c.getContext('2d'); g.fillStyle = '#fbf3a6'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
-        const t = document.createElement('canvas'); t.width = 260; t.height = Math.round(260 * c.height / c.width);
-        t.getContext('2d').drawImage(c, 0, 0, t.width, t.height);
-        return { full: c.toDataURL('image/jpeg', 0.84), thumb: t.toDataURL('image/jpeg', 0.85) };
+        return { full: c.toDataURL('image/jpeg', 0.84) };
       })()`);
       // 牌：拼成一張圖；並匯出說明文字
       const r = await evaluate(`(async () => {
@@ -171,21 +171,28 @@ async function main() {
   const boards = mobileBoards(tmp);
   fs.rmSync(tmp, { recursive: true, force: true });
   const r = await render(boards);
-  fs.mkdirSync(path.join(OUT, 'images'), { recursive: true });
+  for (const d of ['images', 'themes']) fs.rmSync(path.join(OUT, d), { recursive: true, force: true });
   for (const t of THEMES) {
-    const a = writeDataUrl(path.join(OUT, 'images', `board-${t}.jpg`), r.boards[t].full);
-    writeDataUrl(path.join(OUT, 'images', `thumb-${t}.jpg`), r.boards[t].thumb);
-    const b = writeDataUrl(path.join(OUT, 'images', `cards-${t}.jpg`), r.cards[t]);
-    console.log(`images/board-${t}.jpg ${(a / 1024).toFixed(0)} KB, images/cards-${t}.jpg ${(b / 1024).toFixed(0)} KB`);
+    const dir = path.join(OUT, 'themes', t);
+    fs.mkdirSync(dir, { recursive: true });
+    const a = writeDataUrl(path.join(dir, 'board.jpg'), r.boards[t].full);
+    const b = writeDataUrl(path.join(dir, 'cards.jpg'), r.cards[t]);
+    fs.writeFileSync(path.join(dir, 'game.js'), '// 分包進入點（本分包只放這個主題的圖片）\n');
+    console.log(`themes/${t}/: board ${(a / 1024).toFixed(0)} KB, cards ${(b / 1024).toFixed(0)} KB`);
   }
+  // 分包清單
+  const gj = path.join(OUT, 'game.json'), conf = JSON.parse(fs.readFileSync(gj, 'utf8'));
+  conf.subpackages = THEMES.map(t => ({ name: t, root: `themes/${t}/` }));
+  fs.writeFileSync(gj, JSON.stringify(conf, null, 2) + '\n');
   fs.mkdirSync(path.join(OUT, 'js', 'data'), { recursive: true });
   fs.writeFileSync(path.join(OUT, 'js', 'data', 'cardinfo.js'),
     `'use strict';\n// 由 tools/build_wechat.js 產生：每個主題、每張牌的說明（HTML）\nmodule.exports = ${JSON.stringify(r.info)};\n`);
   bundlePreview();
-  // 主套件不得超過 4 MB
-  let total = 0;
-  (function walk(d) { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); const st = fs.statSync(p); if (st.isDirectory()) walk(p); else total += st.size; } })(OUT);
-  console.log(`wechat/ total ${(total / 1024 / 1024).toFixed(2)} MB (limit 4 MB for the main package)`);
-  if (total > 4 * 1024 * 1024) { console.error('超過 4 MB'); process.exitCode = 1; }
+  // 主套件不得超過 4 MB，全部（含分包）不得超過 30 MB
+  const size = d => fs.readdirSync(d).reduce((a, f) => { const p = path.join(d, f), st = fs.statSync(p); return a + (st.isDirectory() ? size(p) : st.size); }, 0);
+  const MB = n => (n / 1024 / 1024).toFixed(2) + ' MB';
+  const total = size(OUT), subs = size(path.join(OUT, 'themes')), main_ = total - subs;
+  console.log(`main package ${MB(main_)} (limit 4 MB); subpackages ${MB(subs)}; total ${MB(total)} (limit 30 MB)`);
+  if (main_ > 4 * 1024 * 1024 || total > 30 * 1024 * 1024) { console.error('套件超過大小上限'); process.exitCode = 1; }
 }
 main().catch(e => { console.error(e); process.exit(1); });

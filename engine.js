@@ -22,24 +22,22 @@ const GEN_BASE = 1000, SPECIAL_BASE = 500;        // 自訂：武將、特別卡
 const GROUPS = { orange: '橙色', blue: '藍色', magenta: '紫紅色', yellow: '黃色', green: '綠色', field: '古戰場' };
 
 /* ---- 棋盤：依原版路線（由此前進 → 官渡 → 回到起點）---- */
-const C = (n, p, g) => ({ t: 'city', n, p, g });
-const F = n => ({ t: 'field', n, p: 1000, g: 'field' });
-const R = { t: 'recruit', n: '徵兵處' };
-const H = { t: 'hire', n: '職業介紹所' };
-const E = { t: 'emergency', n: '緊急軍情' };
-const K = { t: 'strategy', n: '錦囊妙計' };
-const SH = fee => ({ t: 'shop', n: '商店街', fee });
+// 這裡只定義每一格的種類、地價、顏色與費用；格子名稱一律來自 themes.js（applyTheme 填入 n）
+const C = (p, g) => ({ t: 'city', p, g });
+const F = () => ({ t: 'field', p: 1000, g: 'field' });
+const R = { t: 'recruit' }, H = { t: 'hire' }, E = { t: 'emergency' }, K = { t: 'strategy' };
+const SH = fee => ({ t: 'shop', fee });
 const TILES = [
-  { t: 'start', n: '起點（武將風雲錄）' },
-  R, C('許昌', 1500, 'orange'), E, C('新野', 1000, 'orange'), H, C('洛陽', 2000, 'orange'), K, C('濮陽', 1000, 'orange'), SH(500), F('赤壁'),
-  { t: 'rest', n: '童彩樂園', fee: 500 },
-  E, C('下邳', 1000, 'blue'), R, C('建業', 2000, 'blue'), K, C('徐州', 1000, 'blue'), H, C('廬江', 1500, 'blue'), SH(500), F('合肥'),
-  { t: 'rest', n: '波霸按摩院', fee: 800 },
-  E, C('天水', 1000, 'yellow'), R, C('漢中', 1500, 'yellow'), K, C('西涼', 1000, 'yellow'), H, C('成都', 2000, 'yellow'), SH(400),
-  { t: 'island', n: '海盜金銀島' }, F('濡須口'),
-  R, C('長沙', 2000, 'magenta'), E, C('永安', 1000, 'magenta'), H, C('江陵', 1500, 'magenta'), K, C('桂陽', 1000, 'magenta'), SH(300), F('五丈原'),
-  { t: 'cottage', n: '三顧茅廬' },
-  E, C('代縣', 1000, 'green'), R, C('南皮', 2000, 'green'), H, C('平原', 1500, 'green'), K, C('晉陽', 1000, 'green'), SH(200), F('官渡'),
+  { t: 'start' },
+  R, C(1500, 'orange'), E, C(1000, 'orange'), H, C(2000, 'orange'), K, C(1000, 'orange'), SH(500), F(),
+  { t: 'rest', fee: 500 },
+  E, C(1000, 'blue'), R, C(2000, 'blue'), K, C(1000, 'blue'), H, C(1500, 'blue'), SH(500), F(),
+  { t: 'rest', fee: 800 },
+  E, C(1000, 'yellow'), R, C(1500, 'yellow'), K, C(1000, 'yellow'), H, C(2000, 'yellow'), SH(400),
+  { t: 'island' }, F(),
+  R, C(2000, 'magenta'), E, C(1000, 'magenta'), H, C(1500, 'magenta'), K, C(1000, 'magenta'), SH(300), F(),
+  { t: 'cottage' },
+  E, C(1000, 'green'), R, C(2000, 'green'), H, C(1500, 'green'), K, C(1000, 'green'), SH(200), F(),
 ].map(t => ({ ...t }));
 const N = TILES.length; // 55
 // 依格子種類找位置（名稱會隨主題改變，不可用名稱查）
@@ -51,7 +49,7 @@ const tn = t => TILES[IDXT(t)].n;
 const SUIT = { S: '♠', H: '♥', D: '♦', C: '♣' };
 const POKER = [
   ['SA', '曹操', 1900, 2000], ['HA', '劉備', 1900, 2000], ['DA', '孫權', 1900, 2000], ['CA', '董卓', 1900, 2000],
-  ['S2', '咸蛋超人', 1850, 1850], ['H2', '黑武士', 1850, 1850], ['D2', '機器戰警', 1850, 1850], ['C2', '蝙蝠俠', 1850, 1850],
+  ['S2', '黃承彥', 1850, 1850], ['H2', '木鹿大王', 1850, 1850], ['D2', '于吉', 1850, 1850], ['C2', '張角', 1850, 1850], // 2 點：身懷異術者
   ['S3', '蔡陽', 1550, 1600], ['H3', '嚴顏', 1550, 1600], ['D3', '董襲', 1550, 1600], ['C3', '貂蟬', 1550, 1600],
   ['S4', '于禁', 1600, 1550], ['H4', '法正', 1600, 1550], ['D4', '黃蓋', 1600, 1550], ['C4', '郭汜', 1600, 1550],
   ['S5', '郭嘉', 1500, 1750], ['H5', '龐統', 1500, 1750], ['D5', '諸葛瑾', 1500, 1750], ['C5', '徐庶', 1500, 1750],
@@ -82,7 +80,8 @@ CARDS.forEach((c, id) => { c.id = id; });
 /* ---- 主題：同一套規則，依主題替換地名與人物姓名 ---- */
 const THEME_SRC = (typeof module === 'object' && typeof require === 'function') ? require('./themes.js')
   : (typeof self !== 'undefined' ? self.SanguoThemes : null);
-const THEMES = THEME_SRC ? THEME_SRC.THEMES : { sanguo: { key: 'sanguo', label: '三國風雲', tiles: TILES.map(t => t.n), cards: {}, strategy: {}, kinds: {} } };
+if (!THEME_SRC) throw new Error('請先載入 themes.js（格子名稱定義在其中）');
+const THEMES = THEME_SRC.THEMES;
 const BASE_CARD_NAME = CARDS.map(c => c.name);
 let themeKey = 'sanguo';
 function applyTheme(key) {
@@ -128,12 +127,13 @@ const pname = p => `<b style="color:${p.color}">${esc(p.name)}</b>`;
 const tname = i => `<b>${TILES[i].n}</b>`;
 const humans = () => G.players.filter(p => !p.ai && p.alive);
 
-function log(html) {
+// holdMs：這條消息停留的毫秒數（預設 S.readMs）；擲骰消息改為與旗幟移動同時進行、停留到走完為止
+function log(html, holdMs) {
   const cur = G && G.cur != null ? G.players[G.cur] : null;
   if (!(S.readMs && cur && cur.ai)) { UI.log(html); return; }
-  const now = Date.now(), start = Math.max(now, readUntil);
-  readUntil = start + S.readMs;
-  UI.log(html, { dur: S.readMs, wait: start - now });
+  const now = Date.now(), start = Math.max(now, readUntil), dur = holdMs ?? S.readMs;
+  readUntil = start + dur;
+  UI.log(html, { dur, wait: start - now });
 }
 const render = () => UI.render();
 const flashDeck = k => UI.flash(k);
@@ -362,7 +362,7 @@ async function humanPick(p, role, kind, opp, i) {
     <p><small>${rememberText(p, opp)}</small></p>
     <b>武將</b>（${HINT.card}；主帥若失去須以 ${fmt(RANSOM)} 贖回）
     <div class="cards">${gens.map(id => `<label class="copt"><input type="radio" name="c" value="${id}" ${id === best ? 'checked' : ''}>${cimg(id)}${id === p.commander ? '<span class="cmdbadge">★主帥</span>' : ''}</label>`).join('')}</div>
-    ${specs.length ? `<b>或改用特別卡</b><div class="cards">${specs.map(id => `<label class="copt"><input type="radio" name="c" value="${id}">${cimg(id)}</label>`).join('')}</div>
+    ${specs.length ? `<b>或改用特別卡</b><div class="cards">${specs.map((id, k) => `<label class="copt"><input type="radio" name="c" value="${id}" ${!gens.length && !k ? 'checked' : ''}>${cimg(id)}</label>`).join('')}</div>
     <small>${[...new Set(specs.map(id => card(id).kind))].map(k => `<b>${KIND_LABEL[k]}</b>：${KIND_HELP[k]}`).join('<br>')}</small>` : ''}`;
   return ask(p, `${esc(p.name)}：選擇出戰的牌`, body, [{ label: '確定', cls: 'pri', value: b => +b.querySelector('input[name=c]:checked').value }]);
 }
@@ -466,7 +466,10 @@ async function territory(p, i) {
   }
 }
 
+// 出戰需要至少一張牌；手上沒有牌時不能單挑或攻城（守方無兵可守時，城池不戰而得）
+const hasCard = p => p.cards.length > 0;
 function aiEncounter(p, i, o, toll, need) {
+  if (!hasCard(p)) return p.troops >= need && o.troops < DEF_TROOPS ? 'siege' : 'toll';
   const strong = bestStat(p, 'atk', true) > estBest(p, o, 'def') || findSpec(p, 'overlord') != null || findSpec(p, 'formation') != null;
   if (p.troops >= need && (o.troops < DEF_TROOPS || (strong && p.troops >= need + DEF_TROOPS))) return 'siege';
   if (toll > 0 && (strong || p.cash < toll)) return 'duel';
@@ -481,10 +484,10 @@ async function encounter(p, i, o) {
       `<p>${levelName(i)}・${GROUPS[T.g]}。${o.rest ? `${pname(o)} 休息中，不得收取過路稅。` : `過路稅：<b>${fmt(toll)}</b>${ownsGroup(o, T.g) ? '（同色全收，加倍）' : ''}。`}</p>
        <p><b>武將單挑</b>：主要目的為避稅。對方可自由選擇是否出戰，不論勝負，本次過路稅皆不得收取。敗方武將被俘虜。</p>
        <p><b>攻城戰</b>：需 ${need} 名兵力（你有 ${p.troops} 名）。不論勝負，你損失 ${need} 名、對方損失 ${DEF_TROOPS} 名。獲勝即佔領 ${T.n}。</p>
-       <p><small>${rememberText(p, o)}・兵力 ${o.troops}</small></p>`,
+       <p><small>${rememberText(p, o)}・兵力 ${o.troops}</small></p>${hasCard(p) ? '' : '<p class="err">你手上沒有牌，不能單挑或攻城（守方兵力不足時仍可佔領）。</p>'}`,
       [{ label: toll === 0 ? '免費通過' : `繳交過路稅 ${fmt(toll)}`, value: 'toll' },
-       { label: '⚔ 武將單挑', value: 'duel', disabled: toll === 0 },
-       { label: `🏯 攻城戰（${need} 兵）`, value: 'siege', disabled: p.troops < need, cls: 'pri' }]);
+       { label: '⚔ 武將單挑', value: 'duel', disabled: toll === 0 || !hasCard(p) },
+       { label: `🏯 攻城戰（${need} 兵）`, value: 'siege', disabled: p.troops < need || (!hasCard(p) && o.troops >= DEF_TROOPS), cls: 'pri' }]);
   }
   if (choice === 'toll') {
     if (toll === 0) { log(`${pname(o)} 休息中，${pname(p)} 免費通過 ${tname(i)}。`); return; }
@@ -493,6 +496,7 @@ async function encounter(p, i, o) {
   } else if (choice === 'duel') {
     log(`${pname(p)} 在 ${tname(i)} 向 ${pname(o)} 提出武將單挑！`);
     let accept;
+    if (!hasCard(o)) { log(`${pname(o)} 手上沒有牌，無法應戰，${pname(p)} 免繳過路稅通過。`); return; }
     if (o.ai) accept = bestStat(o, 'def', true) > estTypical(o, p, 'atk') || findSpec(o, 'overlord') != null || findSpec(o, 'formation') != null;
     else {
       await handoff(o);
@@ -521,6 +525,11 @@ async function encounter(p, i, o) {
     if (o.troops < DEF_TROOPS) {
       G.tiles[i].owner = p.id;
       await tell(o.ai ? p : o, '攻城戰', `${pname(o)} 兵力不足，無法防禦敵軍攻城，${tname(i)} 被迫棄守，歸 ${pname(p)} 所有。`);
+      return;
+    }
+    if (!hasCard(o)) {
+      G.tiles[i].owner = p.id;
+      await tell(o.ai ? p : o, '攻城戰', `${pname(o)} 手上沒有牌可出戰，${tname(i)} 被迫棄守，歸 ${pname(p)} 所有。`);
       return;
     }
     let defend = true;
@@ -589,17 +598,17 @@ async function goRest(p, n, fee, where) {
 const EMERGENCY = [
   { t: '天災人禍，百姓流離失所，義軍雪中送炭。', s: '向每人說：可憐喔！可憐我吧！再收取每人 1000 兩捐款。',
     f: async p => { for (const q of others(p)) await pay(q, 1000, p); } },
-  { t: '★城池遭遇「胖胖族」洗劫，損失慘重。', s: '損失大小每座城池 500 兩，領地上無城池者免除。',
+  { k: 'raid', t: '★城池遭遇西涼羌兵洗劫，損失慘重。', s: '損失大小每座城池 500 兩，領地上無城池者免除。',
     f: p => pay(p, 500 * owned(p).filter(i => G.tiles[i].level > 0).length, null) },
-  { t: '★您的部隊軍紀散漫，誤中敵軍美人計。', s: '前進至波霸按摩院休息三次，並說「真爽真爽」三次。',
+  { k: 'parlor', t: '★中了王允的連環美人計，軍心渙散，困守郿塢。', s: '前進至郿塢休息三次。',
     f: async p => { const i = IDXT('rest', 1); await moveTo(p, i); await goRest(p, 3, TILES[i].fee, TILES[i].n); } },
-  { t: '乘船中遇強烈颱風，飄至金銀島，遇見虎克船長，兩人結拜兄弟。', s: '速至金銀島，並找一位玩伴，兩人跪地鞠躬，說「你是我兄弟」。',
+  { k: 'island', t: '洛陽甄官井中五色毫光沖天，撈得失落的傳國玉璽。', s: '速至甄官井尋寶，擲骰子領取點數 ×1000 兩的賞金。',
     f: async p => { await moveTo(p, IDXT('island')); await land(p); } },
-  { t: '日本巨星－蠟筆小新為你介紹武將 2 名。', s: '前進至茅廬，如經起點領取雙倍慰勞金，並扭屁股 5 下。',
+  { k: 'mentor', t: '水鏡先生司馬徽為你舉薦臥龍、鳳雛，介紹武將 2 名。', s: '前進至茅廬，如經起點領取雙倍慰勞金。',
     f: async p => { await moveTo(p, IDXT('cottage'), true); await gainCards(p, 2, tn('emergency'), '貴人介紹武將 2 名'); } },
-  { t: '★設壇做法，招來鍾馗為你助陣，贏得勝利。', s: '念咒語「阿里不達阿不多」三次，得士兵 1000 名。',
+  { k: 'magic', t: '★設壇做法，請來烏角先生左慈施展仙術，撒豆成兵為你助陣。', s: '得士兵 1000 名。',
     f: p => { p.troops += 1000; } },
-  { t: '★勇聚殺敵，轟動武林，驚動萬教，招待你至童彩樂園。', s: '前進至童彩樂園休息一次，並向每人收取 1000 兩。',
+  { t: '★勇聚殺敵，轟動武林，驚動萬教，招待你至銅雀台。', s: '前進至銅雀台休息一次，並向每人收取 1000 兩。',
     f: async p => { const i = IDXT('rest', 0); await moveTo(p, i); await goRest(p, 1, TILES[i].fee, TILES[i].n); for (const q of others(p)) await pay(q, 1000, p); } },
   { t: '★高薪禮聘請來建築大師「狐搜疤盜」設計大城 2 座。', s: '任意在自己之領地上建設大城或小城改建大城。',
     f: async p => {
@@ -611,14 +620,14 @@ const EMERGENCY = [
         G.tiles[i].level = 2; log(`${pname(p)} 在 ${tname(i)} 建成大城。`); render();
       }
     } },
-  { t: '中央情報局超級 007 情報員，飛鴿傳回敵方軍情。', s: '任選敵方一名，查看其所有武將及軍力。',
+  { k: 'spy', agent: '蔣幹', t: '派說客蔣幹過江探營，盜得敵軍機密書信。', s: '任選敵方一名，查看其所有武將及軍力。',
     f: async p => {
       const opts = others(p).map(q => ({ label: q.name, value: q }));
       const q = p.ai ? opts.sort((a, b) => b.value.cards.length - a.value.cards.length)[0]?.value
-        : await choose(p, '007 情報員', '選擇要查看的敵方：', opts);
+        : await choose(p, `派${spyAgent()}打探`, '選擇要打探的敵方：', opts);
       if (!q) return;
       q.cards.forEach(id => seenBy(p, q, id));
-      log(`${pname(p)} 的 007 情報員查看了 ${pname(q)} 的所有武將及軍力。`);
+      log(`${pname(p)} 派${spyAgent()}打探，看清了 ${pname(q)} 的所有武將及軍力。`);
       if (!p.ai) await ok(p, `${esc(q.name)} 的軍情`, `<p>兵力 ${q.troops} 名、軍費 ${fmt(q.cash)}</p><div class="cards">${q.cards.map(id => `<div class="copt">${cimg(id)}</div>`).join('') || '（無牌）'}</div>`);
     } },
   { t: '★敵軍大舉入侵，幸遇仙人指點，全軍脫離戰場。', s: '前進至最近「錦囊妙計」抽卡一張，並得士兵 500 名。',
@@ -628,15 +637,15 @@ const EMERGENCY = [
     } },
   { t: '★勤政愛民，深得民心，大笑三聲鼓舞自己。', s: '送給其他敵軍每人 1000 兩，並說「感謝支持謝謝啦」。',
     f: async p => { for (const q of others(p)) if (!(await pay(p, 1000, q))) return; } },
-  { t: '★學得葵花寶典，苦練學成乾坤大挪移心法。', s: '可隨心所欲，前進或退後十步內之任何地點。',
+  { k: 'move', title: '木牛流馬', t: '★得諸葛亮所造木牛流馬，運糧行軍來去自如。', s: '可隨心所欲，前進或退後十步內之任何地點。',
     f: async p => {
       const opts = [];
       for (let k = -10; k <= 10; k++) if (k) opts.push({ label: `${k > 0 ? '前進' : '退後'} ${Math.abs(k)} 步：${TILES[(p.pos + k + N) % N].n}`, value: k });
-      const k = p.ai ? aiBestStep(p, opts.map(o => o.value)) : await choose(p, '乾坤大挪移', '選擇要移動到的地點：', opts);
+      const k = p.ai ? aiBestStep(p, opts.map(o => o.value)) : await choose(p, themeCard('move').title || EMERGENCY.find(c => c.k === 'move').title, '選擇要移動到的地點：', opts);
       if (k > 0) await move(p, k); else { p.pos = (p.pos + k + N) % N; render(); }
       await land(p);
     } },
-  { t: '★勤練兵法，派兵參加體能競賽，並交報名費 1000 元。', s: '做仰臥起坐：5 下領 1000 兩，10 下領 3000 兩，15 下領 10000 兩；放棄或未滿 5 下者不得領獎。',
+  { t: '★勤練兵法，派兵參加體能競賽，並交報名費 1000 兩。', s: '做仰臥起坐：5 下領 1000 兩，10 下領 3000 兩，15 下領 10000 兩；放棄或未滿 5 下者不得領獎。',
     f: async p => {
       if (!(await pay(p, 1000, null))) return;
       const prize = p.ai ? pickRandom([0, 1000, 1000, 3000, 3000, 10000])
@@ -742,13 +751,19 @@ function stealGeneral(p, q) {
 }
 const slip = (head, text, sub) => `<div class="slip"><div class="hd">${head}</div><div>${text}</div>${sub ? `<small>（${sub}）</small>` : ''}</div>`;
 
+// 主題對某張緊急軍情卡的替換內容（themes.js 的 emergency）
+const themeCard = k => (k && (THEMES[themeKey].emergency || {})[k]) || {};
+// 打探敵情卡的探子：三國為蔣幹，其他主題可在 themes.js 指定
+const spyAgent = () => themeCard('spy').agent || EMERGENCY.find(c => c.k === 'spy').agent;
 // 卡面文字中提到的格子名稱，換成目前主題的名稱
-const themedText = str => themeKey === 'sanguo' ? str : str.replace(/錦囊妙計|波霸按摩院|童彩樂園|金銀島|茅廬/g, m =>
-  ({ 錦囊妙計: tn('strategy'), 波霸按摩院: TILES[IDXT('rest', 1)].n, 童彩樂園: TILES[IDXT('rest', 0)].n, 金銀島: tn('island'), 茅廬: tn('cottage') })[m]);
+const themedText = str => themeKey === 'sanguo' ? str : str.replace(/錦囊妙計|郿塢|銅雀台|甄官井|茅廬/g, m =>
+  ({ 錦囊妙計: tn('strategy'), 郿塢: TILES[IDXT('rest', 1)].n, 銅雀台: TILES[IDXT('rest', 0)].n, 甄官井: tn('island'), 茅廬: tn('cottage') })[m]);
 
 async function drawEmergency(p) {
   flashDeck('emergency');
-  const e = pickRandom(EMERGENCY), c = { ...e, t: themedText(e.t), s: themedText(e.s) };
+  // 主題可替換個別卡面文字（themes.js 的 emergency，以卡的 k 為鍵）；其餘卡只換格子名稱
+  const e = pickRandom(EMERGENCY), o = themeCard(e.k);
+  const c = { ...e, t: o.t || themedText(e.t), s: o.s || themedText(e.s) };
   log(`${pname(p)} 抽到${tn('emergency')}：${c.t}（${c.s}）`);
   render();
   if (!p.ai) await ok(p, tn('emergency'), slip(tn('emergency'), c.t, c.s)); else await sleep(S.aiDelay);
@@ -887,23 +902,27 @@ async function land(p) {
 /* ------------------------------------------------------------------ *
  *  行軍與回合
  * ------------------------------------------------------------------ */
-async function move(p, steps, doublePass = false) {
+// withDice：擲骰後的移動與擲骰消息同時進行，逐格前進時不等消息讀完
+async function move(p, steps, doublePass = false, withDice = false) {
   for (let k = 0; k < steps; k++) {
     p.pos = (p.pos + 1) % N;
     if (p.pos === 0 && k < steps - 1) {
       const amt = S.passStart * (doublePass ? 2 : 1);
       p.cash += amt; log(`${pname(p)} 經過起點，向國庫支領 ${fmt(amt)} 軍費。`);
     }
-    render(); await sleep(p.ai ? S.stepMs : 110); // 電腦逐格前進的速度可由 opts.stepMs 調整
+    render(); // 電腦逐格前進的速度可由 opts.stepMs 調整
+    if (withDice) await UI.sleep(p.ai ? S.stepMs : 110); else await sleep(p.ai ? S.stepMs : 110);
   }
   if (p.pos === 0 && steps > 0) { p.cash += S.passStart * 2; log(`${pname(p)} 停留起點，加倍領取 ${fmt(S.passStart * 2)} 軍費！`); render(); }
 }
 const moveTo = (p, target, doublePass) => move(p, (target - p.pos + N) % N, doublePass);
 async function rollAndMove(p) {
   const r = roll(1), s = r[0]; // 全遊戲只用一顆骰子（1–6 點）
+  await waitRead(); // 先讀完之前的消息
   showDice(r);
-  log(`${pname(p)} 擲出 ${s} 點。`);
-  await move(p, s);
+  // 擲骰消息與旗幟移動同時進行：電腦的消息停留到旗幟走完
+  log(`${pname(p)} 擲出 ${s} 點。`, p.ai ? s * S.stepMs : undefined);
+  await move(p, s, false, true);
   await land(p);
 }
 async function showHand(p) {
@@ -1006,6 +1025,9 @@ function viewFor(vid) {
       toll: isProp(i) && t.owner != null ? (G.players[t.owner].rest ? 0 : tollOf(i)) : null })),
   };
 }
+
+// 載入時先套用三國主題的名稱（格子名稱只定義在 themes.js）
+applyTheme('sanguo');
 
 return {
   S, TILES, GROUPS, CITY_TOLL, FIELD_TOLL, BUILD_COST, SIEGE_NEED, LEVEL_NAME, DEF_TROOPS, HIRE_COST, RANSOM, SALE_TAX,

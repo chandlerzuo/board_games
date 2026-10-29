@@ -3,8 +3,8 @@
 ## Listing text
 
 - **Name:** 英雄掷天下 (Traditional: 英雄擲天下). Check that it's free with 名称检测 when registering.
-- **Description (小游戏介绍, 4–120 characters):** 以三国、水浒为题材的回合制策略棋盘游戏。掷骰行军，购置领地、建设城池，招募武将单挑攻城，善用锦囊妙计扭转战局。支持2至4人同机对战或挑战电脑，率先占领二十处领地者一统天下。
-- **Tagline / share title:** 掷骰行军，攻城略地——三国、水浒英雄任你调遣。
+- **Description (小游戏介绍, 4–120 characters):** 以三国、水浒、封神、西游、楚汉为题材的回合制策略棋盘游戏。掷骰行军，购置领地、建设城池，招募武将单挑攻城，善用锦囊妙计扭转战局。支持2至4人同机对战或挑战电脑，率先占领二十处领地者一统天下。
+- **Tagline / share title:** 掷骰行军，攻城略地——古今英雄任你调遣。
 
 This folder is a WeChat mini game project. It runs the same rules engine as the web version (`engine.js`, `themes.js`, `texts.js`, `server/form.js`) and draws everything on a canvas, because mini games have no HTML. It is single-device only for now: one player against the computer, or several people passing one phone.
 
@@ -40,7 +40,7 @@ The build does the following:
 1. Copies the shared engine files into `wechat/js/lib/`.
 2. Draws the phone boards and the card sheets as JPGs in headless Chrome, and writes the card descriptions to `wechat/js/data/cardinfo.js`.
 3. Writes the browser preview bundle.
-4. Checks that the whole package stays under WeChat's 4 MB main-package limit. It's currently about 3.3 MB.
+4. Puts each theme's board and cards (about 1.6 MB) in its own subpackage, `wechat/themes/<key>/`, listed in `game.json`. The phone downloads a theme's subpackage only when that theme is picked; the start button shows the download progress. The main package keeps only the code and small theme previews, about 0.45 MB against WeChat's 4 MB limit. All five themes together are about 8.3 MB, against the 30 MB total limit.
 
 The generated files are git-ignored, so run the build again after changing the engine, the themes or the art.
 
@@ -72,11 +72,7 @@ The trial version doesn't go through WeChat's review, so it's the right stage fo
 
 WeChat reviews the game when you submit it. Things to sort out first:
 
-- **Content that would likely be rejected** (operating rules 2.5.5, 2.5.6 and 2.6.2):
-  - The four 2-cards show copyrighted characters: 咸蛋超人 (Ultraman), 黑武士 (Darth Vader), 機器戰警 (RoboCop) and 蝙蝠俠 (Batman).
-  - The Sanguo rest square is named 波霸按摩院, which is sexually suggestive.
-  - Some event cards mention 蠟筆小新, 007, 葵花寶典 and 乾坤大挪移, and one charges "1000 元".
-  - The phone boards already have no brand logos; the web boards still do.
+- **Content** (operating rules 2.5.5, 2.5.6 and 2.6.2: trademarks, copyrighted characters, vulgar content): the known issues are fixed. The brand logos are gone, the licensed 2-card characters are replaced, and the suggestive and off-theme card texts are rewritten. Re-check any new names or text you add.
 - **Paperwork** for a free game without in-app purchases:
   - **游戏自审自查报告:** filled in online.
   - **适龄提示:** the age-suitability notice.

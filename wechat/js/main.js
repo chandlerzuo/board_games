@@ -20,7 +20,7 @@ const safeBottom = sys.safeArea && sys.safeArea.bottom ? Math.max(0, H - sys.saf
 // 右上角的系統膠囊按鈕：畫面避開它
 let menu = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null;
 if (!menu || !menu.width) menu = { top: safeTop + 4, bottom: safeTop + 36, left: W - 95, right: W - 7, width: 88, height: 32 };
-const GAME_NAME = '英雄擲天下', TAGLINE = '擲骰行軍，攻城略地——三國、水滸英雄任你調遣。';
+const GAME_NAME = '英雄擲天下', TAGLINE = '擲骰行軍，攻城略地——古今英雄任你調遣。';
 if (wx.showShareMenu) wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] });
 if (wx.onShareAppMessage) wx.onShareAppMessage(() => ({ title: `${GAME_NAME}：擲骰行軍，攻城略地` }));
 if (wx.onShareTimeline) wx.onShareTimeline(() => ({ title: `${GAME_NAME}：擲骰行軍，攻城略地` }));
@@ -32,9 +32,24 @@ function loadImg(src) {
   if (IMG[src]) return IMG[src];
   const im = wx.createImage(); im.onload = requestDraw; im.src = src; IMG[src] = im; return im;
 }
-const boardImg = key => loadImg(`images/board-${key}.jpg`);
-const cardsImg = key => loadImg(`images/cards-${key}.jpg`);
-const thumbImg = key => loadImg(`images/thumb-${key}.jpg`); // 設定畫面用的小圖（大圖解碼後很佔記憶體，只載入正在玩的主題）
+// 每個主題的棋盤與牌圖放在各自的分包（themes/<主題>/），用到時才下載；主套件只有設定畫面用的小圖
+const themePack = {}; // 主題 → { done, progress, p }
+function ensureTheme(key) {
+  const st = themePack[key] || (themePack[key] = { done: false, progress: 0, p: null });
+  if (st.done) return Promise.resolve();
+  if (st.p) return st.p;
+  st.p = new Promise((res, rej) => {
+    if (!wx.loadSubpackage) { st.done = true; res(); return; }
+    const task = wx.loadSubpackage({ name: key,
+      success: () => { st.done = true; requestDraw(); res(); },
+      fail: e => { st.p = null; requestDraw(); rej(e); } });
+    if (task && task.onProgressUpdate) task.onProgressUpdate(r => { st.progress = r.progress || 0; requestDraw(); });
+  });
+  return st.p;
+}
+const themeReady = key => !!(themePack[key] && themePack[key].done);
+const boardImg = key => themeReady(key) ? loadImg(`themes/${key}/board.jpg`) : null;
+const cardsImg = key => themeReady(key) ? loadImg(`themes/${key}/cards.jpg`) : null;
 const SHEET_COLS = 9, CELL_W = 240, CELL_H = 336; // 牌圖拼版：每張 240×336，每列 9 張
 
 /* ---------------- 狀態 ---------------- */
@@ -52,6 +67,8 @@ function useTheme(key) {
   E.applyTheme(key);
   board.img = boardImg(key);
   cardsImg(key);
+  // 下載這個主題的分包，完成後換上棋盤與牌圖
+  ensureTheme(key).then(() => { if (app.theme === key) { board.img = boardImg(key); cardsImg(key); requestDraw(); } }, () => {});
   requestDraw();
 }
 useTheme(setup.theme);
@@ -60,7 +77,7 @@ useTheme(setup.theme);
 function drawCard(c, id, x, y, w) {
   const h = Math.round(w * CELL_H / CELL_W), im = cardsImg(app.theme), r = Math.max(3, w * 0.07);
   c.save(); rrect(c, x, y, w, h, r); c.clip();
-  if (im.width) c.drawImage(im, (id % SHEET_COLS) * CELL_W, Math.floor(id / SHEET_COLS) * CELL_H, CELL_W, CELL_H, x, y, w, h);
+  if (im && im.width) c.drawImage(im, (id % SHEET_COLS) * CELL_W, Math.floor(id / SHEET_COLS) * CELL_H, CELL_W, CELL_H, x, y, w, h);
   else { c.fillStyle = '#fffdf6'; c.fillRect(x, y, w, h); c.fillStyle = COLOR.ink; c.font = font(Math.max(10, w * 0.16), 700); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(E.CARDS[id].name, x + w / 2, y + h / 2); c.textAlign = 'left'; }
   c.restore();
   rrect(c, x, y, w, h, r); c.strokeStyle = '#a89f8a'; c.lineWidth = 1; c.stroke();
@@ -259,18 +276,19 @@ function drawSetup() {
   y += 12;
   // 主題
   ctx.fillStyle = COLOR.ink; ctx.font = font(SIZE.body, 700); ctx.fillText('選擇主題', x0, y + 12); y += 28;
-  const keys = Object.keys(E.THEMES), tw = (cw - 12) / keys.length, tH = 178;
+  // 每列三個主題
+  const keys = Object.keys(E.THEMES), cols = 3, gap = 10, tw = (cw - gap * (cols - 1)) / cols, tH = 150;
   keys.forEach((k, j) => {
-    const T = E.THEMES[k], tx = x0 + j * (tw + 12), on = k === setup.theme;
+    const T = E.THEMES[k], tx = x0 + (j % cols) * (tw + gap), ty = y + Math.floor(j / cols) * (tH + gap), on = k === setup.theme;
+    const y_ = y; y = ty; // 以下沿用 y 為這一格的上緣
     fillR(ctx, tx, y, tw, tH, 12, on ? '#fff8e1' : '#fff', on ? COLOR.pri : COLOR.line, on ? 3 : 1.5);
-    const im = thumbImg(k), ih = tH - 50, iw = ih * BW / BH;
-    if (im.width) ctx.drawImage(im, tx + (tw - iw) / 2, y + 8, iw, ih);
-    ctx.fillStyle = on ? COLOR.pri : COLOR.ink; ctx.font = font(SIZE.body + 1, 700); ctx.textAlign = 'center';
-    ctx.fillText(T.label, tx + tw / 2, y + tH - 26); ctx.textAlign = 'left';
-    if (on) { ctx.fillStyle = COLOR.pri; ctx.font = font(SIZE.tiny, 700); ctx.textAlign = 'center'; ctx.fillText('已選擇', tx + tw / 2, y + tH - 9); ctx.textAlign = 'left'; }
+    const bh = tH - 30, bw = Math.min(tw - 16, bh * 0.72);
+    drawBook(ctx, tx + (tw - bw) / 2, y + 8, bw, bh, T.label, BOOK_COLOR[k] || '#3b4a5a');
+    if (on) { ctx.fillStyle = COLOR.pri; ctx.font = font(SIZE.tiny, 700); ctx.textAlign = 'center'; ctx.fillText('✓ 已選擇', tx + tw / 2, y + tH - 11); ctx.textAlign = 'left'; }
     addHit({ x: tx, y, w: tw, h: tH, tap: () => { setup.theme = k; useTheme(k); saveSetup(); } });
+    y = y_;
   });
-  y += tH + 16;
+  y += Math.ceil(keys.length / cols) * (tH + gap) + 6;
   // 人數
   ctx.fillStyle = COLOR.ink; ctx.font = font(SIZE.body, 700); ctx.fillText('參加人數', x0, y + 22);
   segmented(x0 + 90, y, cw - 90, 44, [['2 人', 2], ['3 人', 3], ['4 人', 4]], setup.n, v => { setup.n = v; saveSetup(); requestDraw(); }, 'n');
@@ -295,7 +313,9 @@ function drawSetup() {
   wrapText(ctx, `佔有領地 ${E.S.winTerr} 處、收齊同色領地，或其他君主全部失敗即獲勝。`, font(SIZE.small), cw).forEach(l => { ctx.fillText(l, x0, y + 10); y += 21; });
   y += 10;
   button(x0, y, (cw - 12) * 0.38, 52, '遊戲說明', { key: 'rules', tap: rulesSheet });
-  button(x0 + (cw - 12) * 0.38 + 12, y, (cw - 12) * 0.62, 52, '開始遊戲', { pri: true, size: 19, key: 'start', tap: startClicked });
+  const pk = themePack[setup.theme], loading = !themeReady(setup.theme) && pk && pk.p;
+  button(x0 + (cw - 12) * 0.38 + 12, y, (cw - 12) * 0.62, 52, loading ? `下載主題中 ${Math.round(pk.progress)}%` : '開始遊戲',
+    { pri: true, size: loading ? SIZE.body : 19, key: 'start', tap: startClicked });
   y += 68;
   // 健康遊戲忠告（小遊戲平台要求顯示）
   ctx.fillStyle = COLOR.sub; ctx.font = font(SIZE.tiny); ctx.textAlign = 'center';
@@ -311,6 +331,38 @@ function drawSetup() {
   // 膠囊按鈕那一列遮住捲上去的內容
   ctx.fillStyle = COLOR.bg; ctx.fillRect(0, 0, W, menu.bottom + 4);
 }
+// 古書（線裝書）封面：右側線裝，左上貼題簽，題簽上直書主題名稱
+const BOOK_COLOR = { sanguo: '#23395b', shuihu: '#2f4a2b', fengshen: '#5b2333', xiyou: '#7a5418', chuhan: '#2b2626' };
+function drawBook(c, x, y, w, h, title, color) {
+  c.save();
+  c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 6; c.shadowOffsetY = 3;
+  fillR(c, x, y, w, h, 3, color);
+  c.restore();
+  // 書頁邊（下緣與左緣露出的紙頁）
+  c.fillStyle = '#efe4c8'; c.fillRect(x + 2, y + h - 3, w - 4, 3);
+  // 封面紋理：細框
+  c.strokeStyle = 'rgba(255,255,255,.14)'; c.lineWidth = 1; c.strokeRect(x + 4, y + 4, w - 8, h - 8);
+  // 右側線裝：四個訂孔與縫線
+  const bx = x + w - Math.max(7, w * 0.11);
+  c.strokeStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.moveTo(bx - 3, y + 2); c.lineTo(bx - 3, y + h - 2); c.stroke();
+  c.strokeStyle = '#e8dcc0'; c.lineWidth = 1.6;
+  for (let k = 0; k < 4; k++) {
+    const hy = y + h * (0.12 + k * 0.253);
+    c.beginPath(); c.moveTo(bx, hy); c.lineTo(x + w, hy); c.stroke();
+    c.beginPath(); c.arc(bx, hy, 1.6, 0, Math.PI * 2); c.fillStyle = '#e8dcc0'; c.fill();
+  }
+  c.beginPath(); c.moveTo(bx, y + h * 0.12); c.lineTo(bx, y + h * 0.88); c.stroke();
+  // 題簽：直書書名
+  const n = title.length, sw = Math.max(16, w * 0.3), sh = h * 0.78, sx = x + w * 0.16, sy = y + h * 0.09;
+  fillR(c, sx, sy, sw, sh, 2, '#f6efd9', '#b9a77d', 1);
+  c.strokeStyle = '#c0392b'; c.lineWidth = 1; c.strokeRect(sx + 2.5, sy + 2.5, sw - 5, sh - 5);
+  const fs = Math.min(sw * 0.72, (sh - 10) / n * 0.92);
+  c.fillStyle = '#1b1b1b'; c.font = font(fs, 700); c.textAlign = 'center'; c.textBaseline = 'middle';
+  const step = (sh - 10) / n;
+  for (let k = 0; k < n; k++) c.fillText(title[k], sx + sw / 2, sy + 5 + step * (k + 0.5));
+  c.textAlign = 'left';
+}
+
 function commanderSheet(k) {
   const used = setup.seats.slice(0, setup.n).map((s, j) => j !== k ? s.cmd : -1);
   const html = COMMANDERS.map(c => `<label class="opt"><input type="radio" name="c" value="${c}" ${c === setup.seats[k].cmd ? 'checked' : ''}> <b>${E.CARDS[c].name}</b>（${E.SUIT[E.CARDS[c].code[0]]}A）${used.includes(c) ? `　<small>第${used.indexOf(c) + 1}位已選</small>` : ''}</label>`).join('');
@@ -324,6 +376,12 @@ function commanderSheet(k) {
 }
 function startClicked() {
   fixSeats(); saveSetup();
+  if (!themeReady(setup.theme)) {
+    ensureTheme(setup.theme).then(() => { if (app.screen === 'setup') startClicked(); },
+      () => infoSheet('下載失敗', '<p>主題圖片下載失敗，請確認網路連線後再試一次。</p>'));
+    requestDraw();
+    return;
+  }
   startGame(setup.seats.slice(0, setup.n).map(s => ({ ai: s.ai, cmd: s.cmd })),
     { aiDelay: setup.speed, theme: setup.theme, hints: { card: '長按牌可看說明', tile: '點格子可查看領地資訊，兩指可放大棋盤' } });
 }

@@ -10,10 +10,10 @@ const CARD_TEXT = {
   HA: '中山靖王劉勝之子，唯德唯賢，寬厚仁義，三顧茅廬得諸葛亮（孔明），自立蜀地。',
   DA: '三國時代吳國君主，權謀幹略，出類拔萃，對待部屬視如己出。',
   CA: '東漢末年掌實權，廢少帝，立獻帝。',
-  S2: '返回鴨母星球時，所乘座之「蛋蛋時空飛艇」誤被施法干擾，迷航進入地球。',
-  H2: '21世紀星際爭霸戰時，為躲避機器戰警，乘時空飛機逃至三國時代。',
-  D2: '與黑武士戰鬥時，被踢屁股心有不甘，發誓報仇追至三國時代。',
-  C2: '為尋找傳說中遺失與古代之秘密武器「火鏞炮」對付「邪惡嘰哩呱啦黨」而來到三國時代。',
+  S2: '諸葛亮之岳父，熟知八陣圖變化，曾引陸遜走出魚腹浦石陣。',
+  H2: '南蠻八納洞洞主，騎白象、搖金鈴，能呼風喚雨，驅使虎豹豺狼上陣。',
+  D2: '道士，往來吳會，燒香讀道書、以符水救人，能祈雨；孫策殺之，冤魂纏身。',
+  C2: '太平道教主，自稱〔天公將軍〕，得天書能呼風喚雨，率黃巾起事。',
   S3: '曹操將領，關羽過五關斬六將時被殺。',
   H3: '蜀將，忠於劉備，曾與黃忠用〔驕兵之計〕打敗夏侯惇。',
   D3: '吳將，臉方口大，為孫權甚愛之將。',
@@ -64,10 +64,15 @@ const FIG = {
   HA: { body: 'robe', hat: ['crown', '#1f3f8f', '#f2c200'], cloth: ['#f2c200', '#c0392b'], beard: ['long', '#2b2b2b'], fold: 1, brow: 'kind' },
   DA: { body: 'armor', hat: ['helm', '#c0392b', '#f2c200'], cloth: ['#c0392b', '#2b5fc1'], weapon: 'spear', ride: 'rock', mouth: 'smile' },
   CA: { body: 'robe', hat: ['cap', '#e84393', '#f1c40f'], fat: 1, cloth: ['#3b4a3a', '#8b6d3a'], ride: 'tank', beard: ['mustache', '#2b2b2b'], brow: 'angry', mouth: 'frown' },
-  S2: { special: 'ultra' },
-  H2: { special: 'vader', weapon: 'sword', cape: '#c0392b' },
-  D2: { special: 'robo', weapon: 'gun' },
-  C2: { special: 'bat' },
+  // 2 點：身懷異術者
+  // 黃承彥：白髮老者，持杖，身旁八陣圖亂石飛轉
+  S2: { body: 'robe', old: 1, hat: ['scholar', '#4e5b31', '#f1c40f'], cloth: ['#6b7f3a', '#f5f0e1'], beard: ['long', '#e8e8e8'], weapon: 'staff', stones: 1, brow: 'kind', mouth: 'smile' },
+  // 木鹿大王：南蠻洞主，膚黑亂髮，豹皮披風，手持三股叉
+  H2: { body: 'robe', fat: 1, face: '#9c6b3f', hair: ['wild', '#141414'], beard: ['full', '#111111'], cloth: ['#7a4a22', '#f1c40f'], weapon: 'fork', cape: '#d9a93a', leo: 1, bare: 1, tattoo: 1, brow: 'angry', mouth: 'open' },
+  // 于吉：白髮道士，持杖，腳踏祥雲
+  D2: { body: 'robe', old: 1, hat: ['daoist', '#6d4c2f', '#f1c40f'], cloth: ['#e8e2d0', '#6d4c2f'], beard: ['long', '#e8e8e8'], weapon: 'staff', cloud: 1, brow: 'kind' },
+  // 張角：黃巾黃袍，仗劍作法，風起雲湧
+  C2: { body: 'robe', hat: ['band', '#f1c40f'], cloth: ['#f1c40f', '#8b1a1a'], beard: ['full', '#1b1b1b'], weapon: 'jian', charm: 1, brow: 'angry', mouth: 'open' },
   S3: { body: 'armor', hat: ['round', '#2b5fc1', '#f2c200'], cloth: ['#2e86de', '#f1c40f'], weapon: 'hammer', brow: 'angry', mouth: 'open' },
   H3: { body: 'robe', hat: ['scholar', '#1f3f8f', '#f2c200'], fat: 1, cloth: ['#3c6fd1', '#e67e22'], weapon: 'spear', ride: 'skate', beard: ['mustache', '#2b2b2b'], mouth: 'smile' },
   D3: { body: 'armor', hat: ['tall', '#c0392b', '#f1c40f'], cloth: ['#c0392b', '#27ae60'], weapon: 'staff', mouth: 'open', brow: 'thick' },
@@ -872,6 +877,23 @@ function figureSvg(code) {
       + shp(`M${HX - 34},${HY + 2} h28 v12 a4,4 0 0 1 -4,4 h-20 a4,4 0 0 1 -4,-4z M${HX + 6},${HY + 2} h28 v12 a4,4 0 0 1 -4,4 h-20 a4,4 0 0 1 -4,-4z`, 'url(#cgGlass)', null, 1.8) + line(HX - 6, HY + 6, HX + 6, HY + 6, OL, 3)
       + curve(`M${HX - 28},${HY + 5} l7,7 M${HX + 12},${HY + 5} l7,7`, '#fff', 1.4, .8) + both(shp(`M${HX - R - 2},${HY + 4} q2,14 14,18 l2,-8 q-10,-2 -16,-10z`, '#2c3e70', null, 1.4))
       + curve(`M${HX - 2},${HY + 20} q4,3 1,6`, '#b5684a', 1.8) + shp(`M${HX - 14},${HY + 30} q14,10 28,0 q-14,4 -28,0z`, '#7a1414', null, 2.4) + EF(HX - 28, HY + 26, 7, 4, 'url(#cgBlush)') + EF(HX + 28, HY + 26, 7, 4, 'url(#cgBlush)');
+  } else if (f.animal === 'monkey') {
+    // 猴（孫悟空、六耳獼猴）：圓耳、滿頭毛、淺色面盤與口鼻
+    s += both(E(HX - R - 4, HY + 4, 15, 17, skin, 'cgFace', 2.2) + EF(HX - R - 4, HY + 5, 8, 10, '#f3c1a5'));
+    s += E(HX, HY, R + 2, R, skin, 'cgFace');
+    s += both(shp(`M${HX - 6},${HY - R + 2} q-10,-14 -24,-10 q10,4 12,14z`, skin, 'cgHairSh', 1.6));
+    s += shp(`M${HX},${HY - 12} q-14,-16 -30,-6 q-12,10 -6,30 q4,20 36,26 q32,-6 36,-26 q6,-20 -6,-30 q-16,-10 -30,6z`, '#f6d2b0', 'cgFace', 2);
+    s += E(HX, HY + 22, 20, 13, '#f9dcc4', null, 1.8) + EF(HX - 5, HY + 17, 2.4, 1.8, '#5d3a1a') + EF(HX + 5, HY + 17, 2.4, 1.8, '#5d3a1a');
+    if (f.mark) s += markSvg(f.mark);
+    s += faceSvg(f, R);
+    if (f.hat) s += hatSvg(f.hat, R);
+  } else if (f.animal === 'pig') {
+    // 豬（豬八戒）：大垂耳、粉紅面、豬鼻
+    s += both(shp(`M${HX - R + 8},${HY - R + 14} q-30,-6 -30,26 q14,4 34,-6z`, skin, 'cgFace', 2.2) + fl(`M${HX - R + 2},${HY - R + 20} q-18,0 -20,18 q10,0 20,-6z`, '#f48fb1', .7));
+    s += E(HX, HY, R + 2, R - 1, skin, 'cgFace');
+    s += faceSvg(f, R);
+    s += E(HX, HY + 16, 17, 12, '#f48fb1', 'cgFace', 2.2) + E(HX - 6, HY + 16, 3, 4.5, '#8d3b5a', null, 0) + E(HX + 6, HY + 16, 3, 4.5, '#8d3b5a', null, 0);
+    if (f.hat) s += hatSvg(f.hat, R);
   } else {
     s += both(E(HX - R + 2, HY + 10, 9, 12, skin, 'cgFace', 2.2) + curve(`M${HX - R + 1},${HY + 4} q-4,6 0,12`, '#b5684a', 1.2));
     s += E(HX, HY, R, R - 2, skin, 'cgFace');
@@ -997,13 +1019,20 @@ const SPECIAL_ART = {
 const RED_SUIT = { H: 1, D: 1 };
 const SUIT_CH = { S: '♠', H: '♥', D: '♦', C: '♣' };
 /* ---- 主題登記：各主題提供自己的人物特徵、介紹文與特別卡圖；未提供者沿用三國版 ---- */
-const ART_THEMES = { sanguo: { fig: FIG, text: CARD_TEXT, art: SPECIAL_ART } };
+const ART_THEMES = { sanguo: { fig: FIG, text: CARD_TEXT, art: SPECIAL_ART, alias: {} } };
 let curTheme = 'sanguo';
 const activeFig = code => ART_THEMES[curTheme].fig[code] || FIG[code];
 const activeText = code => { const t = ART_THEMES[curTheme].text[code]; return t != null ? t : (CARD_TEXT[code] || ''); };
-const activeArt = code => ART_THEMES[curTheme].art[code] || SPECIAL_ART[code];
+// alias：沿用其他主題的特別卡圖，例如 { SK: 'shuihu:SK', HQ: 'HQ' }（不寫主題即三國版）
+const activeArt = code => {
+  const t = ART_THEMES[curTheme];
+  if (t.art[code]) return t.art[code];
+  const a = t.alias[code];
+  if (a) { const [th, c] = a.includes(':') ? a.split(':') : ['sanguo', a]; return (ART_THEMES[th] && ART_THEMES[th].art[c]) || SPECIAL_ART[c]; }
+  return SPECIAL_ART[code];
+};
 // d: { fig, text, art }；art 中的鬼牌請用 'ogre' 這個鍵
-function registerCardTheme(key, d) { ART_THEMES[key] = { fig: d.fig || {}, text: d.text || {}, art: d.art || {} }; }
+function registerCardTheme(key, d) { ART_THEMES[key] = { fig: d.fig || {}, text: d.text || {}, art: d.art || {}, alias: d.alias || {} }; }
 function setCardTheme(key) { if (ART_THEMES[key]) curTheme = key; }
 
 const _cardCache = {};
@@ -1036,6 +1065,17 @@ function cardInfoHtml(c, help) {
 }
 
 window.cardSvg = cardSvg;
+// 單一人物圖（不含牌框），供棋盤起點格使用；fy 為腳底的 y 座標（牌面座標 250×350）
+window.cardFigure = (theme, code) => {
+  const prev = curTheme;
+  setCardTheme(theme);
+  const f = activeFig(code), R = f.fat ? 52 : 48, seated = ['moto', 'tank', 'rock', 'trike', 'chair', 'jet'].includes(f.ride);
+  const fy = HY + R - 6 + 54 + (seated ? 22 : 30) + 34;
+  const svg = tidy(figureSvg(code));
+  curTheme = prev;
+  return { svg, fy };
+};
+window.cardDefs = () => CARD_DEFS.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
 window.cardInfoHtml = cardInfoHtml;
 window.registerCardTheme = registerCardTheme;
 window.setCardTheme = setCardTheme;

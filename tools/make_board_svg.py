@@ -24,7 +24,10 @@ def load_theme_names():
     """從 themes.js 讀出各主題的 55 個格子名稱，確保與遊戲一致"""
     src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'themes.js'), encoding='utf8').read()
     out = {}
-    for key, var in (('sanguo', 'SANGUO_TILES'), ('shuihu', 'SHUIHU_TILES')):
+    # 主題順序取自 order: [...]；格子名稱陣列命名為 <主題>_TILES（如 FENGSHEN_TILES）
+    keys = re.findall(r"'(\w+)'", re.search(r'order: \[(.*?)\]', src).group(1))
+    for key in keys:
+        var = key.upper() + '_TILES'
         body = re.search(r'const ' + var + r' = \[(.*?)\];', src, re.S).group(1)
         names = re.findall(r"'([^']+)'", body)
         assert len(names) == 55, (key, len(names))
@@ -38,20 +41,21 @@ def paren(s_):                          # 起點名稱「起點（武將風雲�
     m = re.search(r'（(.+?)）', s_)
     return m.group(1) if m else s_
 
-R, Hh, E, K = ('recruit', '徵兵處'), ('hire', '職業介紹所'), ('emergency', '緊急軍情'), ('strategy', '錦囊妙計')
-def C(n, p, g): return ('city', n, p, g)
-def F(n): return ('field', n, 1000, 'field')
-def SH(fee, logo): return ('shop', '商店街', fee, logo)
-TILES = [('start', '武將風雲錄'),
-  R, C('許昌',1500,'orange'), E, C('新野',1000,'orange'), Hh, C('洛陽',2000,'orange'), K, C('濮陽',1000,'orange'), SH(500,'seven'), F('赤壁'),
-  ('rest', '童彩樂園', 500),
-  E, C('下邳',1000,'blue'), R, C('建業',2000,'blue'), K, C('徐州',1000,'blue'), Hh, C('廬江',1500,'blue'), SH(500,'mc'), F('合肥'),
-  ('rest', '波霸按摩院', 800),
-  E, C('天水',1000,'yellow'), R, C('漢中',1500,'yellow'), K, C('西涼',1000,'yellow'), Hh, C('成都',2000,'yellow'), SH(400,'kfc'),
-  ('island', '金銀島'), F('濡須口'),
-  R, C('長沙',2000,'magenta'), E, C('永安',1000,'magenta'), Hh, C('江陵',1500,'magenta'), K, C('桂陽',1000,'magenta'), SH(300,'coke'), F('五丈原'),
-  ('cottage', '茅廬'),
-  E, C('代縣',1000,'green'), R, C('南皮',2000,'green'), Hh, C('平原',1500,'green'), K, C('晉陽',1000,'green'), SH(200,'fm'), F('官渡')]
+# 每一格的種類與畫法所需資料（順序同 engine.js 的 TILES）；格子名稱一律來自 themes.js
+R, Hh, E, K = ('recruit',), ('hire',), ('emergency',), ('strategy',)
+def C(p, g): return ('city', p, g)
+def F(): return ('field', 1000, 'field')
+def SH(fee): return ('shop', fee)
+TILES = [('start',),
+  R, C(1500,'orange'), E, C(1000,'orange'), Hh, C(2000,'orange'), K, C(1000,'orange'), SH(500), F(),
+  ('rest', 500),
+  E, C(1000,'blue'), R, C(2000,'blue'), K, C(1000,'blue'), Hh, C(1500,'blue'), SH(500), F(),
+  ('rest', 800),
+  E, C(1000,'yellow'), R, C(1500,'yellow'), K, C(1000,'yellow'), Hh, C(2000,'yellow'), SH(400),
+  ('island',), F(),
+  R, C(2000,'magenta'), E, C(1000,'magenta'), Hh, C(1500,'magenta'), K, C(1000,'magenta'), SH(300), F(),
+  ('cottage',),
+  E, C(1000,'green'), R, C(2000,'green'), Hh, C(1500,'green'), K, C(1000,'green'), SH(200), F()]
 assert len(TILES) == len(BOXES) == 55
 
 COL = {'orange': '#ef5a28', 'blue': '#2f7fd8', 'yellow': '#f6d43a', 'green': '#3aa655', 'magenta': '#d8345f', 'field': '#a0452a'}
@@ -158,33 +162,28 @@ def small(i, kind):
             out += t(x + w/2, y + h - (h - ih) / 4 + fs * 0.35, '抽牌', fs, '#fff')
     return out
 
-def shop(i, fee, logo):
+def shop(i, fee):
+    """商店：名稱、通用的攤販圖示（條紋遮陽篷與櫃台，不使用任何品牌標誌）與消費金額"""
     x, y, w, h = box(i)
     m = min(w, h)
-    bg = {'seven': '#fff', 'mc': '#e2331f', 'kfc': '#fff', 'coke': '#fff', 'fm': '#f6d43a'}[logo]
-    out = frame(x, y, w, h, '#f6d43a' if logo != 'mc' else '#e2331f')
-    out += t(x + w/2, y + h * 0.22, nm(i), fit(nm(i), w, h, m * 0.19), '#111' if logo != 'mc' else '#fff')
+    out = frame(x, y, w, h, '#f6d43a')
+    out += t(x + w/2, y + h * 0.22, nm(i), fit(nm(i), w, h, m * 0.19), '#111')
     lw, lh = m * 0.62, m * 0.45
     lx, ly = x + w/2 - lw/2, y + h * 0.3
-    out += f'<rect x="{lx:.0f}" y="{ly:.0f}" width="{lw:.0f}" height="{lh:.0f}" fill="{bg}" stroke="#1a1a1a" stroke-width="2"/>'
-    cx, cy = x + w/2, ly + lh/2
-    if logo == 'seven':
-        out += f'<rect x="{lx+4:.0f}" y="{cy - lh*0.3:.0f}" width="{lw-8:.0f}" height="{lh*0.15:.0f}" fill="#f28c28"/><rect x="{lx+4:.0f}" y="{cy + lh*0.15:.0f}" width="{lw-8:.0f}" height="{lh*0.15:.0f}" fill="#d22630"/>'
-        out += t(cx, cy + lh*0.32, '7', lh * 0.95, '#0a8f4e', 900)
-    elif logo == 'mc':
-        out += f'<path d="M{cx - lw*0.35:.0f},{cy + lh*0.35:.0f} q{lw*0.09:.0f},{-lh*0.9:.0f} {lw*0.175:.0f},0 q{lw*0.09:.0f},{-lh*0.9:.0f} {lw*0.175:.0f},0 q{lw*0.09:.0f},{-lh*0.9:.0f} {lw*0.175:.0f},0 q{lw*0.09:.0f},{-lh*0.9:.0f} {lw*0.175:.0f},0" fill="none" stroke="#ffc72c" stroke-width="{lw*0.08:.0f}"/>'
-    elif logo == 'kfc':
-        out += f'<circle cx="{cx:.0f}" cy="{cy:.0f}" r="{lh*0.42:.0f}" fill="#fbe3c8" stroke="#111" stroke-width="3"/>'
-        out += f'<path d="M{cx - lh*0.25:.0f},{cy + lh*0.1:.0f} q{lh*0.25:.0f},{lh*0.45:.0f} {lh*0.5:.0f},0" fill="#fff" stroke="#111" stroke-width="3"/>'
-        out += f'<rect x="{cx - lh*0.3:.0f}" y="{cy - lh*0.12:.0f}" width="{lh*0.6:.0f}" height="{lh*0.12:.0f}" fill="#111"/>'
-    elif logo == 'coke':
-        out += f'<rect x="{lx+4:.0f}" y="{ly+4:.0f}" width="{lw-8:.0f}" height="{lh-8:.0f}" fill="#e41e2b"/>'
-        out += t(cx, cy + lh*0.14, 'Coca-Cola', lw * 0.17, '#fff', 700, extra='font-style="italic" font-family="Georgia,serif"')
-    elif logo == 'fm':
-        out += f'<rect x="{lx+4:.0f}" y="{ly+4:.0f}" width="{lw-8:.0f}" height="{lh-8:.0f}" fill="#1f8f4e"/>'
-        for k in range(3):
-            out += f'<path d="M{cx - lw*0.3 + k*lw*0.12:.0f},{cy + lh*0.3:.0f} q0,{-lh*0.6:.0f} {lw*0.25:.0f},{-lh*0.55:.0f}" fill="none" stroke="#fff" stroke-width="5"/>'
-    out += t(x + w/2, y + h * 0.93, f'消費{fee}', m * 0.15, '#111' if logo != 'mc' else '#fff')
+    out += f'<rect x="{lx:.0f}" y="{ly:.0f}" width="{lw:.0f}" height="{lh:.0f}" fill="#fff" stroke="#1a1a1a" stroke-width="2"/>'
+    # 遮陽篷：紅白相間的條紋，下緣呈波浪
+    ah, n = lh * 0.42, 5
+    sw_ = (lw - 8) / n
+    for k in range(n):
+        sx_ = lx + 4 + k * sw_
+        out += (f'<path d="M{sx_:.1f},{ly + 4:.1f} h{sw_:.1f} v{ah:.1f} q{-sw_ / 2:.1f},{lh * 0.12:.1f} {-sw_:.1f},0z" '
+                f'fill="{"#d8282b" if k % 2 == 0 else "#fff"}" stroke="#1a1a1a" stroke-width="1.5"/>')
+    # 櫃台與貨品
+    cy0 = ly + 4 + ah + lh * 0.1
+    out += f'<rect x="{lx + 8:.1f}" y="{cy0:.1f}" width="{lw - 16:.1f}" height="{ly + lh - 4 - cy0:.1f}" fill="#a8743f" stroke="#1a1a1a" stroke-width="1.5"/>'
+    for k, c in enumerate(('#f2c200', '#3aa655', '#e8457a')):
+        out += f'<circle cx="{lx + lw * (0.3 + k * 0.2):.1f}" cy="{cy0 - lh * 0.02:.1f}" r="{lh * 0.07:.1f}" fill="{c}" stroke="#1a1a1a" stroke-width="1.2"/>'
+    out += t(x + w/2, y + h * 0.93, f'消費{fee}', m * 0.15, '#111')
     return out
 
 DEFS = '''
@@ -334,7 +333,7 @@ def cn_roof(rl, rr, top, xl, xr, bot, n=10, fill='url(#gRoof)', dark='#0f5426', 
         out += LN(x0, bot - tip + 2, x0, bot - tip + 12, OL, 1.5) + P(f'M{x0 - 4},{bot - tip + 18} q4,-10 8,0z', 'url(#gGold)', 1.4)
     return out
 
-def mini_general(cx, foot, s, helm, armor, skin='url(#gSkin)', beard=None, weapon='spear', plume='#e53935', cape='#c62828', brow='angry'):
+def mini_general(cx, foot, s, helm, armor, skin='url(#gSkin)', beard=None, weapon='spear', plume='#e53935', cape='#c62828', brow='angry', flagch='帥'):
     """起點卷軸上的 Q 版武將（s 為比例，foot 為腳底 y）"""
     def M(v):
         return v * s
@@ -355,7 +354,7 @@ def mini_general(cx, foot, s, helm, armor, skin='url(#gSkin)', beard=None, weapo
     elif weapon == 'flag':
         out += LN(cx + M(32), foot - M(4), cx + M(32), hy - M(80), OL, M(4)) + LN(cx + M(32), foot - M(4), cx + M(32), hy - M(80), '#8a5a2b', M(2.4))
         out += PS(f'M{cx + M(34)},{hy - M(78)} q{M(18)},{-M(6)} {M(34)},{M(2)} q{-M(4)},{M(16)} 0,{M(32)} q{-M(16)},{-M(8)} {-M(34)},{-M(2)}z', '#f6c90e', 'gShadeV')
-        out += TX(cx + M(51), hy - M(52), '帥', M(18), '#c62828', '#fff', 0)
+        out += TX(cx + M(51), hy - M(52), flagch, M(18), '#c62828', '#fff', 0)
     # 腿與靴
     for dx in (-M(10), M(10)):
         out += RC(cx + dx - M(7), foot - M(26), M(14), M(18), '#3b3b5c', 1.8)
@@ -407,6 +406,38 @@ def mini_general(cx, foot, s, helm, armor, skin='url(#gSkin)', beard=None, weapo
     out += P(f'M{cx - M(3)},{hy - r - M(14)} h{M(6)} l{-M(1)},{-M(10)} h{-M(4)}z', 'url(#gGold)', 1.4)
     out += P(f'M{cx},{hy - r - M(22)} q{-M(14)},{-M(4)} {-M(8)},{-M(22)} q{M(4)},{M(8)} {M(8)},{M(4)} q{M(4)},{M(4)} {M(8)},{-M(4)} q{M(6)},{M(18)} {-M(8)},{M(22)}z', plume, 1.6)
     return out
+
+# 起點的三位人物取自牌面人物圖（tools/card_figures.js，需要 Node.js）；沒有 Node.js 時改畫下列簡易武將
+def load_figures():
+    import json, subprocess
+    try:
+        out = subprocess.run(['node', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'card_figures.js')], capture_output=True, check=True, timeout=60)
+        return json.loads(out.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+FIGURES = load_figures()
+
+# 簡易武將（左、右、中持帥旗者）：盔、甲、膚色、鬍鬚、兵器、盔纓、披風、眉、旗上文字
+START_TRIO = {
+    'sanguo': [('#2e7d32', '#2e7d32', '#e0503c', 'long', 'guandao', '#f6c90e', '#1b5e20', 'thick'),          # 關羽
+               ('#1e5fbf', '#1e5fbf', 'url(#gSkin)', 'full', 'spear', '#e53935', '#0d3b8a', 'angry'),        # 張飛
+               ('#c62828', '#d4a017', 'url(#gSkin)', None, 'flag', '#ffffff', '#b71c1c', 'kind', '帥')],     # 劉備
+    'shuihu': [('#37474f', '#455a64', 'url(#gSkin)', 'full', 'spear', '#ffffff', '#263238', 'angry'),        # 林沖
+               ('#c62828', '#c62828', '#d98a6a', 'full', 'guandao', '#f1c40f', '#7f1d1d', 'angry'),          # 秦明
+               ('#1f2d5a', '#d4a017', '#c98f62', None, 'flag', '#f6c90e', '#1f2d5a', 'kind', '義')],          # 宋江
+    'fengshen': [('#dfe6e9', '#90a4ae', 'url(#gSkin)', None, 'spear', '#2b5fc1', '#2b5fc1', 'thick'),        # 楊戩
+                 ('#e53935', '#e53935', 'url(#gSkin)', None, 'spear', '#f1c40f', '#f1c40f', 'angry'),        # 哪吒
+                 ('#2b5fc1', '#f5f0e1', 'url(#gSkin)', 'long', 'flag', '#ffffff', '#2b5fc1', 'kind', '周')], # 姜子牙
+    'xiyou': [('#2c3e50', '#2c3e50', '#f4b6c2', None, 'guandao', '#f1c40f', '#1b1b1b', 'kind'),             # 豬八戒
+              ('#5d6d7e', '#5d6d7e', '#a0785a', 'full', 'spear', '#c0392b', '#34495e', 'thick'),             # 沙悟淨
+              ('#f1c40f', '#f1c40f', '#d9a066', None, 'flag', '#c0392b', '#c0392b', 'angry', '經')],         # 孫悟空
+    'chuhan': [('#7b241c', '#7b241c', 'url(#gSkin)', 'full', 'guandao', '#f1c40f', '#3e2723', 'angry'),      # 樊噲
+               ('#2b5fc1', '#2b5fc1', 'url(#gSkin)', None, 'spear', '#ffffff', '#0d3b8a', 'thick'),          # 韓信
+               ('#c62828', '#d4a017', 'url(#gSkin)', 'long', 'flag', '#ffffff', '#b71c1c', 'kind', '漢')],   # 劉邦
+}
+
+# 起點城樓上兩面旗的文字
+START_FLAGS = {'sanguo': '蜀吳', 'shuihu': '忠義', 'fengshen': '周商', 'xiyou': '唐佛', 'chuhan': '漢楚'}
 
 def start(i):
     W0, H0 = 525, 610
@@ -477,7 +508,7 @@ def start(i):
     s += cn_roof(256, 336, 110, 226, 366, 140, 7, 'url(#gRoofB)', '#13306b', '#a8d8ff', 12, 5)
     s += EL(296, 98, 6, 6, 'url(#gGold)', 2) + LN(296, 92, 296, 84, OL, 2) + EL(296, 82, 3, 3, '#e53935', 1)
     # 旗幟
-    for (fx, c, ch) in ((170, '#2e7d32', '蜀'), (420, '#1e5fbf', '吳')):
+    for (fx, c, ch) in ((170, '#2e7d32', START_FLAGS.get(THEME, '蜀吳')[0]), (420, '#1e5fbf', START_FLAGS.get(THEME, '蜀吳')[1])):
         top_ = 170 if fx != 212 else 190
         s += LN(fx, 262, fx, top_, OL, 4) + LN(fx, 262, fx, top_, '#8a5a2b', 2.2) + EL(fx, top_ - 2, 3, 3, 'url(#gGold)', 1.2)
         dirn = 1 if fx < 400 else -1
@@ -485,9 +516,13 @@ def start(i):
         s += PS(d, c, 'gShadeV', 2.2) + P(f'M{fx},{top_ + 2} q{dirn * 14},-6 {dirn * 30},2', 'none', 3, '#f6c90e')
         s += TX(fx + dirn * 15, top_ + 22, ch, 15, '#fff', '#000', 0)
     # 三位武將
-    s += mini_general(208, 548, .95, '#2e7d32', '#2e7d32', '#e0503c', 'long', 'guandao', '#f6c90e', '#1b5e20', 'thick')
-    s += mini_general(382, 548, .95, '#1e5fbf', '#1e5fbf', 'url(#gSkin)', 'full', 'spear', '#e53935', '#0d3b8a', 'angry')
-    s += mini_general(296, 556, 1.08, '#c62828', '#d4a017', 'url(#gSkin)', None, 'flag', '#ffffff', '#b71c1c', 'kind')
+    figs = FIGURES['themes'].get(THEME) if FIGURES else None
+    for k, ((gx, gfoot, gs), g) in enumerate(zip(((208, 548, .95), (382, 548, .95), (296, 556, 1.08)), START_TRIO.get(THEME, START_TRIO['sanguo']))):
+        if figs:   # 用牌面人物（與該主題牌上的模樣一致）
+            kk = .6 * gs
+            s += f'<g transform="translate({gx - 125 * kk:.1f},{gfoot - figs[k]["fy"] * kk:.1f}) scale({kk:.3f})">{figs[k]["svg"]}</g>'
+        else:
+            s += mini_general(gx, gfoot, gs, *g)
     out += sc + f'<g clip-path="url(#cpStart)">{s}</g>'
     out += RC(X0, Y0, X1 - X0, Y1 - Y0, 'none', 4, 12) + RC(X0 + 5, Y0 + 5, X1 - X0 - 10, Y1 - Y0 - 10, 'none', 2, 9, 'stroke="#c28a2c"')
     # 由此前進
@@ -901,6 +936,367 @@ def decks():
                 out += t(x + w * 0.2, y + h * 0.22 + n * h * 0.2, ch, h * 0.17)
     return out
 
+# ---------------- 各主題圖畫格（休息處、寶地、招賢處） ----------------
+# 每個主題四個圖畫格的畫法，依格子名稱繪製；三國的三顧茅廬沿用 cottage()。
+# 畫布大小同原圖：休息處一 420×385、休息處二 490×405、寶地 300×393、招賢處 350×320
+SLOT_SIZE = {'rest0': (420, 385), 'rest1': (490, 405), 'island': (300, 393), 'cottage': (350, 320)}
+
+def s_label(W0, H0, name, y=None):
+    """網頁版：圖上方的木匾寫地名（手機版改用下方橫幅，不畫）"""
+    if MOBILE:
+        return ''
+    fs = min(40, (W0 * 0.62) / max(1, len(name)))
+    w = fs * len(name) + 36
+    y = 6 if y is None else y
+    return (RC(W0 / 2 - w / 2, y, w, fs + 18, 'url(#gSign)', 3, 8) + RC(W0 / 2 - w / 2 + 5, y + 5, w - 10, fs + 8, 'none', 1.6, 5, 'stroke="#f6c90e"')
+            + TX(W0 / 2, y + fs + 4, name, fs, '#fff3b0', '#5a2a0a', 4))
+def s_ground(W0, H0, c='url(#gGround)'):
+    return EL(W0 / 2, H0 - 26, W0 / 2 - 4, 26, c, 0)
+def s_cloud(cx, cy, s=1.0, op=.95):
+    return ''.join(EL(cx + dx * s, cy + dy * s, r * s, r * .7 * s, '#ffffff', 2, '#9fb6c9', f'fill-opacity="{op}"') for dx, dy, r in ((-22, 4, 18), (0, -6, 22), (24, 4, 17)))
+def s_water(x, y, w, h):
+    return RC(x, y, w, h, 'url(#gSea)', 2.5, 8) + RC(x, y, w, h, 'url(#pWave)', 0, 8)
+def s_hall(x0, x1, base, wall_h, roof_h, fill='#c0392b', door=True, roof='url(#gRoof)', dark='#0f5426', light='#8ff0a6'):
+    """一座中式殿堂：牆、柱、門、翹簷屋頂"""
+    w = x1 - x0
+    o = RC(x0, base - wall_h, w, wall_h, fill, 2.5) + RC(x0, base - wall_h, w, wall_h, 'url(#gShadeV)', 0)
+    for k in range(5):
+        px = x0 + 6 + k * (w - 12) / 4
+        o += RC(px - 4, base - wall_h, 8, wall_h, 'url(#gPillar)', 1.6)
+    if door:
+        o += RC(x0 + w / 2 - w * .1, base - wall_h * .7, w * .2, wall_h * .7, '#5a2a0a', 2) + LN(x0 + w / 2, base - wall_h * .7, x0 + w / 2, base, '#2a1408', 1.6)
+    o += cn_roof(x0 + w * .22, x1 - w * .22, base - wall_h - roof_h, x0 - 18, x1 + 18, base - wall_h + 4, 8, roof, dark, light)
+    return o
+def s_steps(cx, base, w, n=4, fill='url(#gMarble)'):
+    o = ''
+    for k in range(n):
+        ww = w - k * w * .12
+        o += RC(cx - ww / 2, base - (k + 1) * 10, ww, 10, fill, 1.8)
+    return o
+def s_flag(x, top, ch, c='#c0392b', h=70):
+    return (LN(x, top, x, top + h + 50, '#5d3a1a', 4) + P(f'M{x},{top} h44 q-8,16 0,32 h-44z', c, 2.2)
+            + TX(x + 20, top + 25, ch, 22, '#fff8e1', OL, 3))
+def s_star(cx, cy, r):
+    """金色四角星（有描邊，在淺色棋盤上也看得到）"""
+    d = f'M{cx},{cy - r} Q{cx + r * .18},{cy - r * .18} {cx + r},{cy} Q{cx + r * .18},{cy + r * .18} {cx},{cy + r} Q{cx - r * .18},{cy + r * .18} {cx - r},{cy} Q{cx - r * .18},{cy - r * .18} {cx},{cy - r}z'
+    return P(d, '#ffd54f', 1.6)
+
+# ---- 三國 ----
+def sc_tongque(W0, H0, name):      # 銅雀台：高台、三層樓閣、屋頂銅雀
+    o = s_ground(W0, H0)
+    o += P(f'M70,{H0 - 30} L110,{H0 - 130} H310 L350,{H0 - 30}z', 'url(#gStone)', 3) + P(f'M70,{H0 - 30} L110,{H0 - 130} H310 L350,{H0 - 30}z', 'url(#pBrick)', 0)
+    o += s_steps(210, H0 - 30, 90, 6)
+    o += s_hall(130, 290, H0 - 130, 60, 30, '#b03a2e')
+    o += s_hall(160, 260, H0 - 222, 44, 26, '#b03a2e', False)
+    # 銅雀
+    bx, by = 210, H0 - 300
+    o += P(f'M{bx - 30},{by + 12} q20,-30 44,-18 q10,-16 22,-8 q-6,6 -10,12 q14,4 18,16 q-30,-4 -44,6 q-14,4 -30,-8z', '#c88a2c', 2.4) + P(f'M{bx - 30},{by + 12} q20,-30 44,-18 q10,-16 22,-8 q-6,6 -10,12 q14,4 18,16 q-30,-4 -44,6 q-14,4 -30,-8z', 'url(#gGold)', 0, extra='fill-opacity=".55"')
+    o += EL(bx + 22, by - 10, 2.5, 2.5, OL, 0)
+    return o + s_label(W0, H0, name)
+def sc_meiwu(W0, H0, name):        # 郿塢：城牆、角樓、城門；城門前戲台上舞姬起舞
+    o = s_ground(W0, H0)
+    base = H0 - 30
+    o += RC(40, base - 190, W0 - 80, 150, 'url(#gWall)', 3) + RC(40, base - 190, W0 - 80, 150, 'url(#pBrick)', 0)
+    for k in range(13):
+        o += RC(40 + k * (W0 - 80) / 13 + 2, base - 206, (W0 - 80) / 13 - 8, 16, 'url(#gWall)', 2)
+    for x in (70, W0 - 70):
+        o += RC(x - 34, base - 250, 68, 60, '#8d5524', 2.5) + cn_roof(x - 16, x + 16, base - 290, x - 48, x + 48, base - 244, 5)
+    o += P(f'M{W0 / 2 - 40},{base - 40} V{base - 100} q40,-40 80,0 V{base - 40}z', '#3a2410', 3)
+    # 戲台與紅燈籠
+    o += RC(90, base - 40, W0 - 180, 30, 'url(#gWood)', 2.5) + RC(90, base - 44, W0 - 180, 8, '#b03a2e', 2)
+    for x in (110, W0 - 110):
+        o += LN(x, base - 44, x, base - 170, '#5d3a1a', 4) + EL(x, base - 150, 12, 15, 'url(#gLantern)', 2)
+    o += dancers(W0 / 2, base - 44, 120, 64)
+    return o + s_label(W0, H0, name)
+
+def sc_well(W0, H0, name):         # 洛陽甄官井：石井、轆轤、井中五色光與玉璽
+    o = s_ground(W0, H0)
+    cx, base = W0 / 2, H0 - 60
+    for k, c in enumerate(('#ff8a80', '#ffd180', '#ffff8d', '#b9f6ca', '#82b1ff')):
+        o += P(f'M{cx - 18 + k * 9},{base - 60} L{cx - 60 + k * 30},{base - 300} L{cx - 40 + k * 30},{base - 300}z', c, 0, extra='fill-opacity=".55"')
+    o += EL(cx, base - 60, 96, 26, '#5d4a3a', 3) + EL(cx, base - 62, 78, 18, '#14212b', 2)
+    o += P(f'M{cx - 96},{base - 60} V{base} q96,34 192,0 V{base - 60}', 'url(#gStone)', 3) + P(f'M{cx - 96},{base - 60} V{base} q96,34 192,0 V{base - 60}', 'url(#pStoneW)', 0)
+    o += LN(cx - 80, base - 60, cx - 80, base - 170, '#5d3a1a', 7) + LN(cx + 80, base - 60, cx + 80, base - 170, '#5d3a1a', 7) + RC(cx - 90, base - 180, 180, 12, 'url(#gWood)', 2.5)
+    o += LN(cx, base - 170, cx, base - 100, '#8d6e63', 2) + RC(cx - 22, base - 104, 44, 34, 'url(#gGold)', 2.5, 4) + TX(cx, base - 80, '璽', 22, '#8b1a1a', '#fff3b0', 2)
+    o += s_star(cx - 100, base - 230, 10) + s_star(cx + 96, base - 260, 8)
+    o += gold_pile(cx, H0 - 22, 190)   # 井邊堆滿撈起的金元寶
+    return o + s_label(W0, H0, name, H0 - 310)   # 招牌緊貼畫面主體上方
+
+# ---- 水滸 ----
+def sc_shizilou(W0, H0, name):     # 獅子樓：兩層酒樓、酒旗、門口石獅
+    o = s_ground(W0, H0)
+    base = H0 - 40
+    o += s_hall(90, 330, base, 90, 30, '#a0522d')
+    o += RC(100, base - 160, 220, 50, '#8d4a1f', 2.5) + RC(100, base - 160, 220, 50, 'url(#pLattice)', 0, extra='opacity=".6"')
+    o += cn_roof(150, 270, base - 210, 80, 340, base - 156, 9)
+    o += s_flag(350, base - 230, '酒', '#c0392b', 60)
+    for x in (70, W0 - 110):
+        o += RC(x, base - 18, 40, 18, 'url(#gStone)', 2) + EL(x + 20, base - 44, 20, 24, '#bdbdbd', 2.5) + EL(x + 20, base - 70, 16, 14, '#cfcfcf', 2.2)
+        o += EL(x + 14, base - 72, 2.5, 2.5, OL, 0) + EL(x + 26, base - 72, 2.5, 2.5, OL, 0) + P(f'M{x + 6},{base - 78} q14,-14 28,0', 'none', 2.2, '#757575')
+    return o + s_label(W0, H0, name)
+def sc_kuaihuolin(W0, H0, name):   # 快活林：林木、酒店、酒旗、酒罈；林間空地上舞姬起舞
+    o = s_ground(W0, H0)
+    base = H0 - 30
+    for x, y, r in ((40, base - 200, 40), (110, base - 236, 46), (450, base - 220, 42), (30, base - 130, 32)):
+        o += tree(x, y, r)
+    o += s_hall(250, 440, base - 6, 80, 30, '#8d5524')
+    o += s_flag(452, base - 210, '酒', '#e67e22', 56)
+    for x in (270, 300):
+        o += EL(x, base - 10, 14, 16, '#6d4c2f', 2.2) + RC(x - 7, base - 32, 14, 7, '#c0392b', 1.6)
+    o += dancers(140, base - 4, 120, 58)
+    return o + s_label(W0, H0, name)
+
+def sc_huangnigang(W0, H0, name):  # 黃泥岡：黃土山岡、松樹、打開的箱籠與金元寶堆
+    o = P(f'M0,{H0 - 20} Q{W0 * .3},{H0 - 230} {W0 * .55},{H0 - 160} Q{W0 * .8},{H0 - 100} {W0},{H0 - 140} V{H0} H0z', '#d4a24c', 3)
+    o += P(f'M0,{H0 - 20} Q{W0 * .3},{H0 - 230} {W0 * .55},{H0 - 160} Q{W0 * .8},{H0 - 100} {W0},{H0 - 140} V{H0} H0z', 'url(#pMud)', 0)
+    o += tree(W0 * .22, H0 - 240, 30, '#2e7d32') + tree(W0 * .8, H0 - 190, 24, '#2e7d32')
+    o += LN(20, H0 - 150, 280, H0 - 170, '#6d4c2f', 5)
+    for x in (30, 210):
+        y = H0 - 100
+        o += RC(x, y, 64, 40, '#8d4a1f', 2.5, 4) + P(f'M{x},{y} l10,-26 h44 l10,26z', '#6d3a17', 2.2)
+    o += gold_pile(W0 / 2, H0 - 24, 200)
+    return o + s_label(W0, H0, name, H0 - 330)   # 招牌緊貼畫面主體上方
+
+def sc_shijie(W0, H0, name):       # 石碣村：湖岸漁村茅屋、漁船、蘆葦
+    o = s_water(0, H0 * .56, W0, H0 * .44)
+    o += P(f'M0,{H0 * .6} Q{W0 * .5},{H0 * .5} {W0},{H0 * .62} V{H0 * .34} H0z', '#9ccc65', 2.5) + P(f'M0,{H0 * .6} Q{W0 * .5},{H0 * .5} {W0},{H0 * .62} V{H0 * .34} H0z', 'url(#gShadeV)', 0)
+    for hx, hw in ((40, 120), (200, 110)):
+        hy = H0 * .52
+        o += RC(hx, hy - 50, hw, 50, 'url(#gMud)', 2.5) + RC(hx, hy - 50, hw, 50, 'url(#pMud)', 0)
+        o += P(f'M{hx - 14},{hy - 46} L{hx + hw / 2},{hy - 96} L{hx + hw + 14},{hy - 46}z', 'url(#gThatch)', 2.5) + P(f'M{hx - 14},{hy - 46} L{hx + hw / 2},{hy - 96} L{hx + hw + 14},{hy - 46}z', 'url(#pThatch)', 0)
+        o += RC(hx + hw * .4, hy - 34, hw * .2, 34, '#3a2410', 2) + RC(hx + hw * .1, hy - 38, hw * .18, 16, '#3a2410', 1.6) + RC(hx + hw * .1, hy - 38, hw * .18, 16, 'url(#pLattice)', 0)
+    for bx, by in ((90, H0 * .82), (250, H0 * .76)):
+        o += P(f'M{bx - 50},{by} q50,26 100,0 l-12,14 h-76z', '#8d5524', 2.5) + LN(bx, by, bx, by - 56, '#5d3a1a', 3) + P(f'M{bx},{by - 54} l32,38 h-32z', '#f5e6c8', 2)
+    for x in range(8, W0, 26):
+        o += LN(x, H0 * .64, x + 4, H0 * .55, '#558b2f', 2.4) + EL(x + 4, H0 * .55, 2.5, 5, '#8d6e63', 0)
+    return o + s_label(W0, H0, name, 4)
+
+# ---- 封神 ----
+def sc_zhaixing(W0, H0, name):     # 摘星樓：入雲高樓，樓頂摘星
+    o = s_ground(W0, H0)
+    base, cx = H0 - 40, W0 / 2
+    o += EL(cx, 110, 190, 105, '#1f2a5a', 2.5) + EL(cx, 110, 190, 105, 'url(#gShadeV)', 0)   # 夜空
+    for k in range(4):
+        w = 170 - k * 32
+        o += RC(cx - w / 2, base - 60 - k * 66, w, 56, '#7b1f3a', 2.5) + RC(cx - w / 2, base - 60 - k * 66, w, 56, 'url(#pLattice)', 0, extra='opacity=".5"')
+        o += cn_roof(cx - w * .25, cx + w * .25, base - 84 - k * 66, cx - w / 2 - 16, cx + w / 2 + 16, base - 56 - k * 66, 6)
+    o += RC(cx - 90, base - 10, 180, 10, 'url(#gMarble)', 2)
+    for x, y, r in ((cx - 120, 90, 14), (cx + 110, 70, 12), (cx + 60, 34, 9), (cx - 70, 40, 9), (cx + 150, 130, 8), (cx - 150, 140, 7)):
+        o += s_star(x, y, r)
+    return o + s_label(W0, H0, name, H0 - 60)
+def sc_jiuchi(W0, H0, name):       # 酒池肉林：鹿台宮殿、酒池、掛肉的樹林；池畔舞姬起舞
+    o = s_ground(W0, H0)
+    base = H0 - 30
+    o += P(f'M150,{base - 80} L170,{base - 170} H320 L340,{base - 80}z', 'url(#gStone)', 3) + P(f'M150,{base - 80} L170,{base - 170} H320 L340,{base - 80}z', 'url(#pBrick)', 0)
+    o += s_hall(190, 300, base - 170, 46, 24, '#c0392b')
+    for x, y in ((50, base - 190), (440, base - 190)):
+        o += tree(x, y, 40, '#558b2f')
+        for dx in (-22, 0, 22):
+            o += LN(x + dx, y + 8, x + dx, y + 30, '#5d3a1a', 1.4) + P(f'M{x + dx - 6},{y + 30} h12 l-2,18 h-8z', '#d7826b', 1.6)
+    o += EL(140, base - 30, 110, 30, '#8e1b3a', 3) + EL(140, base - 32, 94, 21, '#d6336c', 0, extra='fill-opacity=".85"')
+    o += P(f'M80,{base - 36} q20,-8 40,0 M150,{base - 26} q20,-8 40,0', 'none', 2, '#ffcdd2')
+    o += dancers(360, base - 4, 116, 56)
+    return o + s_label(W0, H0, name)
+
+def sc_jinao(W0, H0, name):        # 金鰲島：海中仙山、宮觀、祥雲；岸邊堆滿金元寶
+    o = s_water(0, H0 * .6, W0, H0 * .4)
+    o += P(f'M10,{H0 * .82} L100,{H0 * .3} L150,{H0 * .42} L210,{H0 * .24} L290,{H0 * .82}z', '#3f7a5a', 3) + P(f'M10,{H0 * .82} L100,{H0 * .3} L150,{H0 * .42} L210,{H0 * .24} L290,{H0 * .82}z', 'url(#gShadeH)', 0)
+    o += P(f'M10,{H0 * .82} Q150,{H0 * .72} 290,{H0 * .82} Q150,{H0 * .9} 10,{H0 * .82}z', 'url(#gSand)', 2.5)
+    o += s_hall(105, 205, H0 * .5, 40, 22, '#b03a2e', False)
+    o += s_cloud(50, H0 * .2, .8) + s_cloud(250, H0 * .14, .7)
+    o += gold_pile(W0 / 2, H0 * .84, 180)
+    return o + s_label(W0, H0, name, H0 * .24 - 66)   # 招牌緊貼畫面主體上方
+
+def sc_weishui(W0, H0, name):      # 渭水釣台：河水、岸石、直鉤垂釣
+    o = s_water(0, H0 * .55, W0, H0 * .45)
+    o += P(f'M0,{H0 * .58} Q60,{H0 * .38} 150,{H0 * .5} L170,{H0 * .62} H0z', 'url(#gStone)', 3)
+    o += LN(110, H0 * .44, 300, H0 * .2, '#6d4c2f', 4) + LN(300, H0 * .2, 300, H0 * .7, '#555', 1.4)
+    o += LN(296, H0 * .7, 304, H0 * .7, '#555', 2)   # 直鉤
+    o += EL(90, H0 * .44, 16, 16, 'url(#gSkin)', 2.2) + P(f'M64,{H0 * .44} q26,-30 52,0z', '#c9a227', 2) + P(f'M76,{H0 * .46} q14,30 28,0', 'none', 2, '#e8e8e8')
+    o += RC(70, H0 * .46, 40, 46, '#2b5fc1', 2.2, 8)
+    for x in (30, 200, 250):
+        o += LN(x, H0 * .56, x + 4, H0 * .44, '#7cb342', 2.4)
+    return o + s_label(W0, H0, name, 4)
+
+# ---- 西遊 ----
+def sc_pantao(W0, H0, name):       # 蟠桃園：仙桃樹、祥雲
+    o = s_ground(W0, H0)
+    base = H0 - 40
+    for x, y, r in ((90, base - 140, 60), (210, base - 180, 70), (330, base - 140, 60)):
+        o += tree(x, y, r, '#5fa83a')
+        for dx, dy in ((-r * .4, -r * .1), (r * .3, -r * .3), (0, r * .25), (r * .5, r * .2), (-r * .2, -r * .5)):
+            o += EL(x + dx, y + dy, 11, 10, '#ff8fa3', 1.8) + EL(x + dx - 3, y + dy - 3, 4, 3, '#fff', 0, extra='fill-opacity=".7"')
+    o += s_cloud(60, 60, .8) + s_cloud(360, 50, .7)
+    return o + s_label(W0, H0, name, H0 - 60)
+def sc_pansi(W0, H0, name):        # 盤絲洞：山洞、洞頂蛛網；洞中舞姬起舞
+    o = P(f'M10,{H0 - 10} L60,{H0 - 300} L180,{H0 - 360} L330,{H0 - 330} L470,{H0 - 260} L480,{H0 - 10}z', '#6d6a75', 3) + P(f'M10,{H0 - 10} L60,{H0 - 300} L180,{H0 - 360} L330,{H0 - 330} L470,{H0 - 260} L480,{H0 - 10}z', 'url(#gShadeH)', 0)
+    o += P(f'M110,{H0 - 10} V{H0 - 180} Q245,{H0 - 330} 380,{H0 - 180} V{H0 - 10}z', '#2a1d36', 3)
+    cx, cy = 245, H0 - 230
+    for k in range(8):
+        a = k * math.pi / 4
+        o += LN(cx, cy, cx + 110 * math.cos(a), cy + 60 * math.sin(a), '#f5f5f5', 1.6, 'stroke-opacity=".8"')
+    for r in (30, 60, 95):
+        pts = ' '.join(f'{cx + r * math.cos(k * math.pi / 4):.0f},{cy + r * .55 * math.sin(k * math.pi / 4):.0f}' for k in range(9))
+        o += f'<polyline points="{pts}" fill="none" stroke="#f5f5f5" stroke-width="1.6" stroke-opacity=".8"/>'
+    o += EL(cx + 60, cy + 10, 9, 11, '#4a148c', 1.6) + EL(cx + 60, cy - 3, 6, 5, '#6a1b9a', 1.4)
+    o += dancers(245, H0 - 18, 130, 64)
+    return o + s_label(W0, H0, name)
+
+def sc_longgong(W0, H0, name):     # 東海龍宮：海底宮殿、珊瑚、氣泡
+    o = RC(0, 0, W0, H0, 'url(#gSea)', 3, 14)
+    o += s_hall(60, 240, H0 - 140, 70, 36, '#2e86c1', roof='url(#gRoofB)', dark='#0b3c5d', light='#aed6f1')
+    o += s_steps(150, H0 - 110, 150, 3) + P(f'M0,{H0 - 30} Q150,{H0 - 70} 300,{H0 - 30} V{H0} H0z', 'url(#gSand)', 2)
+    o += gold_pile(150, H0 - 34, 190)   # 海底龍宮前的金元寶
+    for x, c in ((30, '#ff7043'), (270, '#ec407a')):
+        o += P(f'M{x},{H0 - 30} q-6,-40 -18,-60 M{x},{H0 - 30} q4,-50 14,-74 M{x},{H0 - 50} q12,-14 22,-12', 'none', 6, c)
+    for x, y, r in ((50, 80, 8), (70, 50, 5), (250, 110, 9), (230, 70, 5), (150, 40, 6)):
+        o += EL(x, y, r, r, '#e3f2fd', 1.6, '#90caf9', 'fill-opacity=".5"')
+    return o + s_label(W0, H0, name, H0 - 316)   # 招牌緊貼畫面主體上方
+def sc_luojia(W0, H0, name):       # 落伽山：南海普陀山、紫竹、蓮臺與佛光
+    o = s_water(0, H0 * .7, W0, H0 * .3)
+    o += P(f'M20,{H0 * .74} L100,{H0 * .3} L170,{H0 * .42} L240,{H0 * .22} L330,{H0 * .74}z', '#5c7a52', 3) + P(f'M20,{H0 * .74} L100,{H0 * .3} L170,{H0 * .42} L240,{H0 * .22} L330,{H0 * .74}z', 'url(#gShadeH)', 0)
+    for bx_ in (40, 56, 300, 316):
+        o += RC(bx_ - 4, H0 * .3, 8, H0 * .44, '#6a1b9a', 1.4, 3)
+    cx, cy = 175, H0 * .5
+    o += EL(cx, cy - 40, 44, 44, 'url(#gGlow)', 0) + EL(cx, cy - 40, 30, 30, 'none', 3, '#ffd54f')
+    for k in range(-2, 3):
+        o += P(f'M{cx + k * 14},{cy + 10} q-8,-26 0,-36 q8,10 0,36z', '#f8bbd0', 1.8)
+    o += EL(cx, cy + 12, 40, 8, '#81c784', 2)
+    return o + s_label(W0, H0, name, 4)
+
+# ---- 楚漢 ----
+def sc_hongmen(W0, H0, name):      # 鴻門：軍帳宴席、酒爵、劍
+    o = s_ground(W0, H0)
+    base = H0 - 40
+    o += P(f'M60,{base} L80,{base - 150} Q210,{base - 260} 340,{base - 150} L360,{base}z', '#e8d5a8', 3) + P(f'M60,{base} L80,{base - 150} Q210,{base - 260} 340,{base - 150} L360,{base}z', 'url(#gShadeH)', 0)
+    o += P(f'M150,{base} V{base - 110} Q210,{base - 150} 270,{base - 110} V{base}z', '#7a1f1f', 2.5)
+    o += RC(120, base - 46, 180, 14, 'url(#gWood)', 2.5) + LN(140, base - 32, 140, base, '#5d3a1a', 4) + LN(280, base - 32, 280, base, '#5d3a1a', 4)
+    for x in (165, 205, 245):
+        o += P(f'M{x - 9},{base - 66} h18 l-4,20 h-10z', 'url(#gGold)', 2)
+    o += s_flag(370, base - 240, '楚', '#1b1b1b', 70)
+    o += f'<g transform="rotate(-30 210 {base - 120})">' + RC(206, base - 200, 8, 90, 'url(#gMetal)', 2) + RC(196, base - 112, 28, 6, 'url(#gGold)', 1.6) + '</g>'
+    return o + s_label(W0, H0, name, H0 - 60)
+def sc_epang(W0, H0, name):        # 阿房宮：連綿宮殿、複道；殿前階上舞姬起舞
+    o = s_ground(W0, H0)
+    base = H0 - 30
+    o += s_hall(30, 180, base - 80, 70, 30, '#3b3b3b', roof='url(#gRoofB)', dark='#1b1b1b', light='#9e9e9e')
+    o += s_hall(310, 460, base - 80, 70, 30, '#3b3b3b', roof='url(#gRoofB)', dark='#1b1b1b', light='#9e9e9e')
+    o += s_hall(170, 320, base - 120, 100, 40, '#7b241c')
+    o += RC(150, base - 186, 190, 10, 'url(#gWood)', 2)
+    o += s_steps(245, base, 440, 4) + RC(25, base - 80, 440, 40, 'url(#gMarble)', 2)
+    o += dancers(245, base - 42, 110, 60)
+    return o + s_label(W0, H0, name)
+
+def sc_lishan(W0, H0, name):       # 驪山陵：覆斗形陵丘、神道、石獸
+    o = s_ground(W0, H0)
+    base = H0 - 50
+    o += P(f'M30,{base} L90,{base - 170} H210 L270,{base}z', '#7a9a5a', 3) + P(f'M30,{base} L90,{base - 170} H210 L270,{base}z', 'url(#gShadeH)', 0)
+    o += P(f'M60,{base - 90} H240', 'none', 2, '#4e6b3a')
+    o += RC(120, base - 60, 60, 60, '#5d4037', 2.5) + P(f'M120,{base - 60} q30,-22 60,0', 'none', 3) + RC(126, base - 50, 48, 50, '#2a1a10', 2)
+    for x in (40, 238):
+        o += RC(x, base - 6, 22, 30, 'url(#gStone)', 2) + EL(x + 11, base - 16, 14, 12, '#bdbdbd', 2)
+    o += gold_pile(150, base + 22, 170)   # 陵門前的陪葬金寶
+    return o + s_label(W0, H0, name, base - 236)   # 招牌緊貼畫面主體上方
+def sc_baijiang(W0, H0, name):     # 築壇拜將：三層將壇、旌旗、帥印
+    o = s_ground(W0, H0)
+    base, cx = H0 - 36, W0 / 2
+    for k in range(3):
+        w = 260 - k * 60
+        o += RC(cx - w / 2, base - (k + 1) * 34, w, 34, 'url(#gStone)', 2.5) + RC(cx - w / 2, base - (k + 1) * 34, w, 34, 'url(#pBrick)', 0)
+    o += RC(cx - 20, base - 102 - 26, 40, 26, 'url(#gGold)', 2.5, 4) + TX(cx, base - 108, '帥', 20, '#8b1a1a', '#fff3b0', 2)
+    o += s_flag(cx - 140, base - 220, '漢', '#c0392b', 80) + s_flag(cx + 100, base - 220, '將', '#c0392b', 80)
+    return o + s_label(W0, H0, name)
+
+# ---- 兩個共同的主圖案 ----
+def dancer(cx, foot, s_, dress='#e91e63', trim='#f8bbd0', sleeve='#fce4ec', flip=False, fan=False):
+    """翩翩起舞的舞姬：髮髻花飾、耳墜、雙層長裙、腰帶飄帶、揚起的水袖；s_ 為身高"""
+    hy, wy, sy = foot - s_ * .86, foot - s_ * .5, foot - s_ * .7
+    o = EL(cx, foot + 2, s_ * .26, s_ * .045, 'url(#gShadow)', 0)
+    # 腰間飄帶
+    o += P(f'M{cx - s_ * .1},{wy} q{-s_ * .3},{s_ * .05} {-s_ * .42},{-s_ * .24} q{s_ * .05},{s_ * .22} {s_ * .36},{s_ * .3}', 'none', s_ * .025, '#4fc3f7')
+    # 外裙與內裙（向一側飄動）
+    o += PS(f'M{cx - s_ * .1},{wy} q{-s_ * .2},{s_ * .3} {-s_ * .34},{s_ * .5} q{s_ * .32},{s_ * .07} {s_ * .74},{-s_ * .05} q{-s_ * .16},{-s_ * .22} {-s_ * .2},{-s_ * .45}z', dress, 'gShadeH', 2.2)
+    o += P(f'M{cx - s_ * .06},{wy + s_ * .05} q{-s_ * .12},{s_ * .25} {-s_ * .2},{s_ * .43} q{s_ * .2},{s_ * .04} {s_ * .42},{-s_ * .03} q{-s_ * .08},{-s_ * .2} {-s_ * .12},{-s_ * .4}z', trim, 1.6)
+    for k in range(3):
+        o += P(f'M{cx - s_ * (.3 - k * .2)},{foot - s_ * .02} q{s_ * .04},{-s_ * .14} {s_ * .02},{-s_ * .3}', 'none', 1.4, '#ffffff', 'stroke-opacity=".6"')
+    # 上衣、雲肩、腰帶
+    o += PS(f'M{cx - s_ * .1},{wy} L{cx - s_ * .085},{sy} H{cx + s_ * .085} L{cx + s_ * .1},{wy}z', dress, 'gShadeH', 2)
+    o += P(f'M{cx - s_ * .1},{sy + s_ * .01} q{s_ * .1},{s_ * .08} {s_ * .2},0 l{-s_ * .02},{s_ * .05} q{-s_ * .08},{s_ * .05} {-s_ * .16},0z', 'url(#gGold)', 1.4)
+    o += RC(cx - s_ * .11, wy - s_ * .035, s_ * .22, s_ * .045, 'url(#gGold)', 1.4) + EL(cx, wy - s_ * .012, s_ * .025, s_ * .025, '#e53935', 1)
+    # 水袖：一手高舉、一手橫展
+    o += P(f'M{cx - s_ * .07},{sy + s_ * .02} q{-s_ * .12},{-s_ * .12} {-s_ * .16},{-s_ * .34} q{-s_ * .1},{s_ * .16} {-s_ * .02},{s_ * .42}z', sleeve, 1.8)
+    o += P(f'M{cx + s_ * .07},{sy + s_ * .02} q{s_ * .22},{-s_ * .02} {s_ * .34},{-s_ * .2} q{s_ * .02},{s_ * .22} {-s_ * .22},{s_ * .3}z', sleeve, 1.8)
+    if fan:  # 團扇
+        o += EL(cx + s_ * .36, sy - s_ * .2, s_ * .07, s_ * .07, '#fff59d', 1.6) + LN(cx + s_ * .36, sy - s_ * .13, cx + s_ * .34, sy - s_ * .05, '#8d6e63', 1.6)
+    # 頭、髮髻、花飾、耳墜、五官
+    o += EL(cx, hy, s_ * .08, s_ * .09, 'url(#gSkin)', 2) + EL(cx, hy - s_ * .1, s_ * .075, s_ * .055, '#1b1b1b', 1.8)
+    o += P(f'M{cx - s_ * .085},{hy - s_ * .015} q{s_ * .085},{-s_ * .12} {s_ * .17},0', '#1b1b1b', 1.8)
+    o += EL(cx - s_ * .06, hy - s_ * .12, s_ * .025, s_ * .025, '#ff80ab', 1) + EL(cx + s_ * .05, hy - s_ * .14, s_ * .02, s_ * .02, '#ffd54f', 1)
+    o += LN(cx + s_ * .03, hy - s_ * .13, cx + s_ * .12, hy - s_ * .18, '#f1c40f', 1.6) + EL(cx + s_ * .12, hy - s_ * .18, 2.4, 2.4, '#e53935', 0.8)
+    o += EL(cx - s_ * .082, hy + s_ * .035, 1.8, 2.8, '#80deea', 0.8) + EL(cx + s_ * .082, hy + s_ * .035, 1.8, 2.8, '#80deea', 0.8)
+    o += EL(cx - s_ * .03, hy, 1.6, 2, OL, 0) + EL(cx + s_ * .03, hy, 1.6, 2, OL, 0)
+    o += EL(cx - s_ * .05, hy + s_ * .03, s_ * .018, s_ * .011, '#ff8a80', 0, extra='fill-opacity=".7"') + EL(cx + s_ * .05, hy + s_ * .03, s_ * .018, s_ * .011, '#ff8a80', 0, extra='fill-opacity=".7"')
+    o += P(f'M{cx - s_ * .02},{hy + s_ * .045} q{s_ * .02},{s_ * .015} {s_ * .04},0', 'none', 1.4, '#c2185b')
+    if flip:
+        o = f'<g transform="translate({2 * cx},0) scale(-1,1)">{o}</g>'
+    return o
+
+def dancers(cx, foot, h, spread=None):
+    """三位舞姬一組（中間者較高、站前），旁有音符"""
+    d = spread or h * .5
+    o = dancer(cx - d, foot - h * .04, h * .9, '#8e24aa', '#e1bee7', '#f3e5f5', flip=True)
+    o += dancer(cx + d, foot - h * .04, h * .9, '#00897b', '#b2dfdb', '#e0f2f1', fan=True)
+    o += dancer(cx, foot, h, '#e91e63', '#f8bbd0', '#fce4ec')
+    o += music_note(cx - d * 1.6, foot - h * .95, h * .26) + music_note(cx + d * 1.25, foot - h * 1.05, h * .24, True)
+    return o
+
+def music_note(x, y, s_, double=False):
+    """音符（八分音符或連桁的兩個音符）"""
+    c, w = '#6a1b9a', max(2, s_ * .09)
+    head = lambda hx, hy: f'<ellipse cx="{hx:.1f}" cy="{hy:.1f}" rx="{s_ * .2:.1f}" ry="{s_ * .14:.1f}" fill="{c}" stroke="#fff" stroke-width="2" transform="rotate(-20 {hx:.1f} {hy:.1f})"/>'
+    if double:
+        x2 = x + s_ * .55
+        return (LN(x + s_ * .17, y, x + s_ * .17, y - s_ * .8, c, w) + LN(x2 + s_ * .17, y, x2 + s_ * .17, y - s_ * .8, c, w)
+                + P(f'M{x + s_ * .17},{y - s_ * .8} L{x2 + s_ * .17},{y - s_ * .8} V{y - s_ * .66} L{x + s_ * .17},{y - s_ * .66}z', c, 1.5, '#fff') + head(x, y) + head(x2, y))
+    return LN(x + s_ * .17, y, x + s_ * .17, y - s_ * .8, c, w) + P(f'M{x + s_ * .17},{y - s_ * .8} q{s_ * .3},{s_ * .12} {s_ * .22},{s_ * .45}', 'none', w, c) + head(x, y)
+def gold_pile(cx, base, w):
+    """金元寶堆：三層元寶、散落的金錢與閃光；w 為寬度"""
+    u = w / 3.2
+    def ingot(x, y):
+        d = f'M{x - u * .55},{y - u * .3} q{u * .55},{u * .55} {u * 1.1},0 l{-u * .14},{u * .3} h{-u * .82}z'
+        return (P(d, 'url(#gGold)', 2.2) + EL(x, y - u * .32, u * .26, u * .2, 'url(#gGold)', 2)
+                + P(f'M{x - u * .5},{y - u * .3} q{u * .5},{u * .22} {u},0', 'none', 1.6, '#fff6b8'))
+    o = EL(cx, base + 4, w * .55, w * .1, 'url(#gShadow)', 0)
+    for k in range(3):
+        o += ingot(cx + (k - 1) * u * 1.05, base)
+    for k in range(2):
+        o += ingot(cx + (k - .5) * u * 1.05, base - u * .55)
+    o += ingot(cx, base - u * 1.1)
+    for dx, dy in ((-1.7, .1), (1.7, .05), (-1.3, .35), (1.4, .35)):
+        x, y = cx + dx * u, base + dy * u
+        o += EL(x, y, u * .22, u * .1, 'url(#gGold)', 1.6) + RC(x - u * .05, y - u * .03, u * .1, u * .06, '#8d6e00', 0)
+    for dx, dy, r in ((-1.1, -1.4, u * .18), (1.2, -1.2, u * .14), (0, -2.0, u * .16)):
+        o += star4(cx + dx * u, base + dy * u, r, '#fffde7')
+    return o
+
+# 各主題的第二個休息處以舞姬與音符為主圖案、寶地以金元寶堆為主圖案，由各畫面安排位置
+# 主題 → 格子 → 畫法（未列出者用原本的圖）
+SCENES = {
+    'sanguo': {'rest0': sc_tongque, 'rest1': sc_meiwu, 'island': sc_well},
+    'shuihu': {'rest0': sc_shizilou, 'rest1': sc_kuaihuolin, 'island': sc_huangnigang, 'cottage': sc_shijie},
+    'fengshen': {'rest0': sc_zhaixing, 'rest1': sc_jiuchi, 'island': sc_jinao, 'cottage': sc_weishui},
+    'xiyou': {'rest0': sc_pantao, 'rest1': sc_pansi, 'island': sc_longgong, 'cottage': sc_luojia},
+    'chuhan': {'rest0': sc_hongmen, 'rest1': sc_epang, 'island': sc_lishan, 'cottage': sc_baijiang},
+}
+THEME = 'sanguo'   # 由 main() 設定
+
+def scene_tile(i, slot, default):
+    f = SCENES.get(THEME, {}).get(slot)
+    if not f:
+        return default(i)
+    W0, H0 = SLOT_SIZE[slot]
+    return place(i, W0, H0, f(W0, H0, nm(i)))
+
 # ---------------- 手機版格子 ----------------
 MIN_SEEN = []   # 記錄手機版用到的字級，供檢查
 
@@ -978,38 +1374,39 @@ def m_field(i):
     return out + mlabel(x + 10, y + 10, w - 20, h - 20, nm(i), '#fff', '#3a1206')
 
 def m_ribbon(i):
-    """圖畫格（休息處、寶島、茅廬）下方的名稱橫幅"""
+    """圖畫格（休息處、寶島、茅廬）上方的名稱橫幅（下方是畫面前景）"""
     x, y, w, h = box(i)
     rh = max(MOBILE_MIN * 1.25, h * 0.24)
-    ry = y + h - rh
+    ry = y
     out = f'<rect x="{x + 6}" y="{ry:.0f}" width="{w - 12}" height="{rh:.0f}" rx="10" fill="#7a1f1f" stroke="#1a1a1a" stroke-width="3" fill-opacity=".92"/>'
     return out + mlabel(x + 12, ry + 4, w - 24, rh - 8, nm(i), '#fff3b0')
 
 def main(theme='sanguo', portrait=False, out=None, mobile=False):
-    global NAMES, PORTRAIT, OUT_W, OUT_H, MOBILE
+    global NAMES, PORTRAIT, OUT_W, OUT_H, MOBILE, THEME
     NAMES = THEME_NAMES[theme]
+    THEME = theme
     MOBILE = mobile
     PORTRAIT = portrait or mobile
     portrait = PORTRAIT
     MIN_SEEN.clear()
     OUT_W, OUT_H = (W, H) if portrait else (H, W)
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {OUT_W} {OUT_H}" font-family="{FONT}">',
-             f'<defs>{DEFS}</defs>',
+             f'<defs>{DEFS}</defs>', FIGURES['defs'] if FIGURES else '',
              f'<rect width="{OUT_W}" height="{OUT_H}" fill="#fbf3a6"/><rect width="{OUT_W}" height="{OUT_H}" fill="url(#dots)"/>',
              decks(), arrows()]
     rest_idx = [i for i, tl in enumerate(TILES) if tl[0] == 'rest']
     for i, tile in enumerate(TILES):
         kind = tile[0]
-        if kind == 'city': parts.append(city(i, nm(i), tile[2], tile[3]))
+        if kind == 'city': parts.append(city(i, nm(i), tile[1], tile[2]))
         elif MOBILE and kind == 'field': parts.append(m_field(i))
-        elif MOBILE and kind == 'shop': parts.append(m_shop(i, tile[2]))
+        elif MOBILE and kind == 'shop': parts.append(m_shop(i, tile[1]))
         elif MOBILE and kind in ('recruit', 'hire', 'emergency', 'strategy'): parts.append(m_small(i, kind))
         elif kind == 'field': parts.append(field(i, nm(i)))
-        elif kind == 'shop': parts.append(shop(i, tile[2], tile[3]))
+        elif kind == 'shop': parts.append(shop(i, tile[1]))
         elif kind == 'start': parts.append(start(i))
-        elif kind == 'rest': parts.append(park(i) if i == rest_idx[0] else parlor(i))
-        elif kind == 'island': parts.append(island(i))
-        elif kind == 'cottage': parts.append(cottage(i))
+        elif kind == 'rest': parts.append(scene_tile(i, 'rest0', park) if i == rest_idx[0] else scene_tile(i, 'rest1', parlor))
+        elif kind == 'island': parts.append(scene_tile(i, 'island', island))
+        elif kind == 'cottage': parts.append(scene_tile(i, 'cottage', cottage))
         else: parts.append(small(i, kind))
         if MOBILE and kind in ('rest', 'island', 'cottage'): parts.append(m_ribbon(i))
     parts.append('</svg>')
@@ -1025,8 +1422,8 @@ if __name__ == '__main__':
     import sys
     if len(sys.argv) == 3 and sys.argv[1] == '--mobile':
         # 手機版直式棋盤：python3 tools/make_board_svg.py --mobile 輸出資料夾
-        for _t in ('sanguo', 'shuihu'):
+        for _t in THEME_NAMES:
             main(_t, mobile=True, out=os.path.join(sys.argv[2], 'board-%s-mobile.svg' % _t))
     else:
-        for _t in ('sanguo', 'shuihu'):
+        for _t in THEME_NAMES:
             main(_t)

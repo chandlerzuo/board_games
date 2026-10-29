@@ -1,6 +1,6 @@
 # 英雄擲天下
 
-以三國、水滸為題材的回合制策略棋盤遊戲。擲骰行軍，購置領地、建設城池，招募武將單挑攻城，善用錦囊妙計扭轉戰局。支援2至4人同機對戰或挑戰電腦，率先佔領二十處領地者一統天下。
+以三國、水滸、封神、西遊、楚漢為題材的回合制策略棋盤遊戲。擲骰行軍，購置領地、建設城池，招募武將單挑攻城，善用錦囊妙計扭轉戰局。支援2至4人同機對戰或挑戰電腦，率先佔領二十處領地者一統天下。
 
 A property-and-siege board game in the style of the original *三國風雲*. It recreates the original board, rule book, poker cards, event cards and territory deeds, and can be played in several themes. The repository folder is `board_games`.
 
@@ -11,16 +11,19 @@ Every theme uses the same rules, prices, tolls and card strengths. A theme only 
 | Theme | Key | Setting | Commanders (the four aces) | Event decks |
 |---|---|---|---|---|
 | 三國風雲 | `sanguo` | Three Kingdoms (*三國演義*) | 曹操、劉備、孫權、董卓 | 緊急軍情 / 錦囊妙計 |
-| 水滸風雲 | `shuihu` | Water Margin (*水滸傳*) | 宋江、盧俊義、晁蓋、方臘 | 江湖告急 / 智取妙計 |
+| 水滸群豪 | `shuihu` | Water Margin (*水滸傳*) | 宋江、盧俊義、晁蓋、方臘 | 江湖告急 / 智取妙計 |
+| 封神演義 | `fengshen` | Investiture of the Gods (*封神演義*) | 姜子牙、姬發、黃飛虎、紂王 | 天機示警 / 仙家妙計 |
+| 西遊歷險 | `xiyou` | Journey to the West (*西遊記*) | 唐三藏、孫悟空、豬八戒、牛魔王 | 妖魔作亂 / 菩薩錦囊 |
+| 楚漢爭霸 | `chuhan` | Chu–Han Contention (*楚漢傳奇*) | 劉邦、項羽、韓信、秦二世 | 烽火急報 / 帷幄妙計 |
 
-Pick the theme on the offline setup screen, or as host in the online lobby. The four 2-cards (咸蛋超人、黑武士、機器戰警、蝙蝠俠) are not historical figures and are the same in every theme.
+Pick the theme on the offline setup screen, or as host in the online lobby. In every theme the four 2-cards are figures known for supernatural powers (in Sanguo: 黃承彥、木鹿大王、于吉、張角), the 7s are mostly strategists, and the Jacks are the strongest fighters. The two rest squares, the treasure square and the recruiting square each use a place from that story (for example 鴻門, 阿房宮, 驪山陵 and 築壇拜將 in Chu–Han), and the event cards that mention people or places are reworded for each theme.
 
 ### Adding a theme
 
-1. **`themes.js`**: add an entry to `THEMES` and its key to `order`. Give it a `label`, `sub` (subtitle), `board` file name, `tiles` (all 55 square names, in the same order as `TILES` in `engine.js`), and optional `cards` (card code → character name), `strategy` (strategy-card key → name) and `kinds` (e.g. `overlord` → joker-card name). Anything not listed keeps the Sanguo name.
-2. **Board**: add the theme to the theme lists in `tools/make_board_svg.py` (`load_theme_names` and the loop at the bottom), then run `python3 tools/make_board_svg.py` to write `board-<key>.svg`.
-3. **Card art (optional)**: write a `theme-<key>-art.js` that calls `registerCardTheme('<key>', { fig, text, art })`, like `theme-shuihu-art.js`, and load it in `index.html` after `cards.js`. Cards it does not cover use the Sanguo art.
-4. **Online play**: add the new board and art files to `FILES` in `server/server.js`. The server only sends files listed there.
+1. **`themes.js`**: add a `<KEY>_TILES` list (all 55 square names, in the same order as `TILES` in `engine.js`), a cards map, an entry in `THEMES` and the key in `order`. The entry has a `label`, `sub` (subtitle), `board` file name, `tiles`, `cards` (card code → name), `strategy` (strategy-card key → name), `kinds` (e.g. `overlord` → joker-card name) and `emergency` (event-card key → replacement text, title or agent). Anything not listed keeps the Sanguo version.
+2. **Board**: run `python3 tools/make_board_svg.py`. It reads every theme in `order` and writes `board-<key>.svg`.
+3. **Card art**: write a `theme-<key>-art.js` that calls `registerCardTheme('<key>', { fig, text, art, alias })`, like `theme-fengshen-art.js`, and load it in `index.html` after `theme-shuihu-art.js`. `alias` reuses another theme's special-card picture (for example `{ SK: 'shuihu:SK' }`), and `window.cardBanner([...])` draws a joker banner with your own text. Cards it doesn't cover use the Sanguo art.
+4. **Online play and WeChat**: nothing to add. The server and `tools/build_wechat.js` pick up every theme from `themes.js`.
 
 ## Files
 
@@ -32,8 +35,8 @@ Pick the theme on the offline setup screen, or as host in the online lobby. The 
 | `texts.js` | Rules book and square descriptions, shared by the web version and the WeChat mini game |
 | `cards.js` | SVG artwork for the 54 poker cards |
 | `themes.js` | Theme data: square names, character names and card names for each theme |
-| `theme-shuihu-art.js` | Water Margin card portraits, descriptions and special-card art |
-| `board-sanguo.svg`, `board-shuihu.svg` | One board per theme |
+| `theme-<key>-art.js` | Card portraits, descriptions and special-card art for each theme other than Sanguo (Sanguo's are in `cards.js`) |
+| `board-<key>.svg` | One board per theme |
 | `tools/make_board_svg.py` | Generates the board files from the names in `themes.js` (`--mobile` writes the portrait phone boards) |
 | `wechat/` | WeChat mini game version (see [`wechat/README.md`](wechat/README.md)) |
 | `tools/build_wechat.js`, `tools/wechat-preview/` | Builds the mini game's images and shared files; previews it in a browser |

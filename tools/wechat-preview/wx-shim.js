@@ -41,5 +41,8 @@
     getStorageSync: k => { try { return JSON.parse(localStorage.getItem('wx:' + k)); } catch (e) { return ''; } },
     setStorageSync: (k, v) => localStorage.setItem('wx:' + k, JSON.stringify(v)),
     showShareMenu: () => {}, setKeepScreenOn: () => {},
+    // 分包：預覽時檔案都在本機，稍等一下就算下載完成
+    loadSubpackage: ({ success }) => { const t = { cb: null, onProgressUpdate(f) { this.cb = f; } };
+      setTimeout(() => { if (t.cb) t.cb({ progress: 100 }); success && success(); }, 150); return t; },
   };
 })();

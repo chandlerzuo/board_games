@@ -36,10 +36,13 @@ const FILES = {
   '/cards.js': ['cards.js', 'text/javascript; charset=utf-8'],
   '/themes.js': ['themes.js', 'text/javascript; charset=utf-8'],
   '/texts.js': ['texts.js', 'text/javascript; charset=utf-8'],
-  '/theme-shuihu-art.js': ['theme-shuihu-art.js', 'text/javascript; charset=utf-8'],
-  '/board-sanguo.svg': ['board-sanguo.svg', 'image/svg+xml'],
-  '/board-shuihu.svg': ['board-shuihu.svg', 'image/svg+xml'],
 };
+// 每個主題的棋盤圖與卡圖檔（名單取自 themes.js，不提供名單以外的檔案）
+for (const th of Object.values(E.THEMES)) {
+  FILES['/' + th.board] = [th.board, 'image/svg+xml'];
+  const art = `theme-${th.key}-art.js`;
+  if (fs.existsSync(path.join(ROOT, art))) FILES['/' + art] = [art, 'text/javascript; charset=utf-8'];
+}
 
 /* ---- 大廳與連線 ---- */
 const NSEATS = 4;

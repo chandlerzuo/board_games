@@ -2,7 +2,7 @@
 // 水滸傳主題：人物特徵、介紹文與特別卡圖（於 cards.js 之後載入）
 (() => {
 
-/* ---- 人物特徵（鍵同 cards.js 之 FIG；未列出者沿用三國版，如咸蛋超人等四張非人卡） ---- */
+/* ---- 人物特徵（鍵同 cards.js 之 FIG；未列出者沿用三國版） ---- */
 const FIG = {
   // 宋江：黑三郎，面黑身短，官帽官袍，手執文筆
   SA: { body: 'robe', face: '#c98f62', hat: ['cap', '#1f2d5a', '#f2c200'], cloth: ['#2f3e73', '#f2c200'], beard: ['goatee', '#1b1b1b'], weapon: 'brush', brow: 'kind', mouth: 'smile' },
@@ -12,6 +12,14 @@ const FIG = {
   DA: { body: 'armor', fat: 1, hat: ['band', '#8b1a1a'], cloth: ['#8d4a16', '#f1c40f'], beard: ['full', '#2b1a10'], weapon: 'pagoda', brow: 'thick', mouth: 'open' },
   // 方臘：僭稱聖公，龍袍冕冠，倨傲
   CA: { body: 'robe', fat: 1, hat: ['crown', '#311b4a', '#f2c200'], cloth: ['#f1c40f', '#8e2b20'], beard: ['full', '#1b1b1b'], fold: 1, brow: 'angry', mouth: 'frown' },
+  // 高廉：高唐州知府，官帽官袍，仗劍作法，飛沙走石
+  S2: { body: 'robe', hat: ['cap', '#1f2d5a', '#f2c200'], cloth: ['#2b3a67', '#c0392b'], beard: ['mustache', '#1b1b1b'], weapon: 'jian', charm: 1, brow: 'angry', mouth: 'frown' },
+  // 公孫勝：入雲龍，道冠道袍，松紋古定劍，腳踏祥雲
+  H2: { body: 'robe', hat: ['daoist', '#2b5fc1', '#f1c40f'], cloth: ['#2e5fa3', '#f5f0e1'], beard: ['long', '#2b2b2b'], weapon: 'jian', cloud: 1, brow: 'kind' },
+  // 喬道清：幻魔君，紫袍道冠，持杖，頭後光輪
+  D2: { body: 'robe', hat: ['daoist', '#5b2c6f', '#f1c40f'], cloth: ['#8e44ad', '#f5f0e1'], beard: ['long', '#2b2b2b'], weapon: 'staff', halo: 1, brow: 'kind' },
+  // 包道乙：方臘國師，老道，飛劍玄天混元劍
+  C2: { body: 'robe', old: 1, hat: ['daoist', '#3b0f0f', '#f2c200'], cloth: ['#7b1f1f', '#f1c40f'], beard: ['long', '#9e9e9e'], weapon: 'jian', charm: 1, brow: 'angry' },
   // 關勝：大刀關勝，面如重棗，綠袍綠盔，青龍偃月刀
   SJ: { body: 'armor', face: '#d8433a', hat: ['helm', '#27ae60', '#f1c40f'], cloth: ['#27ae60', '#f1c40f'], beard: ['long', '#111111'], weapon: 'guandao', brow: 'thick', eyes: 'narrow' },
   // 林沖：豹子頭，環眼怒目，豹紋披風，丈八蛇矛
@@ -46,8 +54,8 @@ const FIG = {
   C8: { body: 'armor', hat: ['helm', '#2c3e50', '#95a5a6'], cloth: ['#34495e', '#c0392b'], beard: ['full', '#2b2b2b'], weapon: 'spear', brow: 'angry', mouth: 'frown' },
   // 吳用：智多星，儒巾文袍，羽扇
   S7: { body: 'robe', hat: ['scholar', '#2c3e50', '#f1c40f'], cloth: ['#1f3f8f', '#f5f0e1'], beard: ['goatee', '#1b1b1b'], weapon: 'fan', brow: 'kind', mouth: 'smile' },
-  // 公孫勝：入雲龍，道冠道袍，松紋古定劍，腳踏祥雲
-  H7: { body: 'robe', hat: ['daoist', '#2b5fc1', '#f1c40f'], cloth: ['#2e5fa3', '#f5f0e1'], beard: ['long', '#2b2b2b'], weapon: 'jian', cloud: 1, brow: 'kind' },
+  // 朱武：神機軍師，高冠綠袍，佩劍布陣
+  H7: { body: 'robe', hat: ['tall', '#1e5631', '#f1c40f'], cloth: ['#2e7d32', '#e8d9a8'], beard: ['mustache', '#1b1b1b'], weapon: 'jian', brow: 'thick', eyes: 'narrow' },
   // 柴進：小旋風，皇族後裔，錦衣無兵
   D7: { body: 'robe', hat: ['cap', '#8e44ad', '#f1c40f'], cloth: ['#c39bd3', '#f5f0e1'], beard: ['goatee', '#1b1b1b'], fold: 1, brow: 'kind', mouth: 'smile' },
   // 王進：禁軍教頭，老成嚴謹，長槍
@@ -88,6 +96,10 @@ const FIG = {
 
 /* ---- 介紹文 ---- */
 const TEXT = {
+  S2: '高唐州知府，高俅之堂弟。善使妖法，能飛沙走石、召喚神兵，曾大敗梁山人馬。',
+  H2: '綽號〔入雲龍〕，道號一清。羅真人門徒，能呼風喚雨、駕霧騰雲，善五雷天罡正法。',
+  D2: '田虎麾下護國靈感真人，人稱〔幻魔君〕。精通幻術，後拜羅真人為師。',
+  C2: '方臘國師，人稱〔靈應天師〕。善使妖法，飛劍〔玄天混元劍〕能取人首級。',
   SA: '綽號〔黑三郎〕，面黑身短。鄆城押司出身，仗義疏財，為梁山泊之主，豎〔替天行道〕杏黃旗。',
   HA: '北京大名府員外，綽號〔玉麒麟〕。相貌堂堂，棍棒天下無對，為梁山馬軍副總兵。',
   DA: '綽號〔托塔天王〕，東溪村保正。能托石塔，劫取生辰綱後上山，為梁山第一任寨主。',
@@ -109,7 +121,7 @@ const TEXT = {
   D8: '大名府正牌軍，綽號〔急先鋒〕。使一條金釘棗陽槊，臨陣爭先，與楊志鬥得難分勝負。',
   C8: '方臘之歙州守將，槍法老練。於獨松關連傷梁山數員頭領，為江南第一勁敵。',
   S7: '綽號〔智多星〕，道號加亮先生。羽扇輕搖計謀百出，智取生辰綱，為梁山軍師。',
-  H7: '綽號〔入雲龍〕，道號一清。羅真人門徒，能呼風喚雨、駕霧騰雲，善五雷天罡正法。',
+  H7: '少華山寨主，人稱〔神機軍師〕。精通陣法、廣有謀略，後為梁山副軍師。',
   D7: '後周皇族之後，綽號〔小旋風〕。滄州大官人，持丹書鐵券，仗義疏財廣納天下好漢。',
   C7: '東京八十萬禁軍教頭，史進之師。棍棒精熟，因避高俅之害而出走延安。',
   S6: '綽號〔九紋龍〕，身上刺九條青龍。少華山首領，使三尖兩刃刀，年少氣盛。',
@@ -261,8 +273,8 @@ const SK = () => EF(125, 190, 122, 108, 'url(#cgHalo)')
   + [[36, 300], [224, 288]].map(([x, y]) => EF(x, y, 26, 13, '#e8dcc0', .5) + EF(x + 16, y + 12, 18, 9, '#e8dcc0', .32)).join('')
   + star4(34, 160, 7, '#fff59d') + star4(228, 220, 6, '#fff59d');
 
-// 替天行道：梁山杏黃大旗、交叉兵器、群山與一百零八星
-const ogre = () => EF(125, 180, 124, 150, 'url(#cgHalo)')
+// 替天行道：梁山杏黃大旗、交叉兵器、群山與一百零八星；旗上文字可換（其他主題的鬼牌也用這面旗，見 window.cardBanner）
+const banner = (chars = ['替', '天', '行', '道']) => EF(125, 180, 124, 150, 'url(#cgHalo)')
   + Array.from({ length: 12 }, (_, k) => { const a = (k * 30 - 90) * Math.PI / 180, r0 = 46, r1 = 168;
     return fl(`M${125 + r0 * Math.cos(a)},${180 + r0 * Math.sin(a)} L${125 + r1 * Math.cos(a - .06)},${180 + r1 * Math.sin(a - .06)} L${125 + r1 * Math.cos(a + .06)},${180 + r1 * Math.sin(a + .06)}z`, '#ffe9a8', .4); }).join('')
   // 梁山群峰
@@ -288,10 +300,12 @@ const ogre = () => EF(125, 180, 124, 150, 'url(#cgHalo)')
   + shp('M79,56 h12 v242 l-12,4z', '#8b1a1a', 'cgShV', 1.8) + shp('M159,56 h12 v246 l-12,-16z', '#8b1a1a', 'cgShV', 1.8)
   + [0, 1, 2, 3, 4, 5].map(k => E(85, 78 + k * 42, 2.8, 2.8, 'url(#cgGold)', null, .9) + E(165, 78 + k * 42, 2.8, 2.8, 'url(#cgGold)', null, .9)).join('')
   + curve('M96,62 v234 M154,62 v232', '#b07a16', 1.4, .5)
-  + ['替', '天', '行', '道'].map((ch, k) => txt(125, 114 + k * 56, ch, 50, '#8b1a1a', 2.2)).join('')
+  + chars.map((ch, k) => txt(125, 198 - (chars.length - 1) * 28 + k * 56, ch, 50, '#8b1a1a', 2.2)).join('')
   // 一百零八星
   + [[44, 70], [62, 112], [34, 148], [206, 72], [192, 116], [218, 152], [72, 44], [180, 42]].map(([x, y], k) => star4(x, y, k % 2 ? 9 : 6, '#fff8c4')).join('')
   + star4(125, 20, 7, '#fff8c4');
 
+const ogre = () => banner();
+window.cardBanner = banner;
 window.registerCardTheme('shuihu', { fig: FIG, text: TEXT, art: { HQ, DQ, CQ, SK, ogre } });
 })();
