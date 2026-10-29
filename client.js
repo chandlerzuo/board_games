@@ -30,7 +30,7 @@ function useTheme(key) {
 }
 const themeOptions = () => E.THEMES && Object.values(E.THEMES).map(th => `<option value="${th.key}">${th.label}</option>`).join('');
 
-/* ---- 棋盤版面：每一格在原版棋盤掃描圖（2122×3000）上的位置 [x, y, 寬, 高]，順序同 TILES ---- */
+/* ---- 棋盤版面：每一格在棋盤掃描圖（2122×3000）上的位置 [x, y, 寬, 高]，順序同 TILES ---- */
 const SCAN = { x: 45, y: 255, w: 1900, h: 2630 }; // 棋盤 SVG 對應掃描圖的裁切範圍
 const BOXES = [[1297,290,610,525],[1690,890,210,142],[1312,840,310,175],[1307,1080,210,140],[1592,1050,310,170],[1690,1285,212,142],
   [1312,1240,310,177],[1307,1480,210,140],[1592,1445,310,177],[1692,1688,208,140],[1690,1895,210,140],[1277,1630,385,420],
@@ -199,11 +199,11 @@ function renderView(v) {
   $('#turnInfo').innerHTML = cp ? `輪到 <span style="color:${cp.color};background:#fff;border-radius:.5cqw;padding:0 .6cqw;text-shadow:none">${esc(cp.name)}</span>${v.me === cp.id ? '（你）' : ''}` : '';
   $('#players').innerHTML = v.players.map(p => {
     const st = !p.alive ? '<span class="tag">已出局</span>'
-      : (p.rest ? `<span class="tag">休息 ${p.rest} 次</span>` : '') + (p.reserveN ? `<span class="tag">錦囊保留卡 ${p.reserveN}</span>` : '');
+      : (p.rest ? `<span class="tag">休息 ${p.rest} 次</span>` : '') + (p.reserveN ? `<span class="tag">保留卡 ${p.reserveN}</span>` : '');
     let hand;
     if (p.hand) {
       hand = `<div class="hand">${p.hand.map(id => `<span onclick="zoomCard(${id})">${cimg(id)}</span>`).join('')}</div>`
-        + (p.reserve?.length ? `<div class="gens">錦囊：${p.reserve.join('、')}</div>` : '');
+        + (p.reserve?.length ? `<div class="gens">保留卡：${p.reserve.join('、')}</div>` : '');
     } else {
       // 他人手牌不公開：只顯示張數，以及你從公開俘虜中記得的牌
       hand = `<div class="gens">${p.hasCmd ? '' : '（主帥失守）'}手牌 ${p.cardN} 張${p.known.length ? `・你記得：<span class="mini">${p.known.map(id => cimg(id, 'mini')).join(' ')}</span>` : ''}</div>`;

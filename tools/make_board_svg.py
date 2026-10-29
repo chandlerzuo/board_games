@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""依原版棋盤掃描量得之格子位置，為每個主題繪製向量版棋盤 board-<主題>.svg。
+"""依棋盤掃描量得之格子位置，為每個主題繪製向量版棋盤 board-<主題>.svg。
 
 座標與 index.html 的 BOXES 相同（掃描圖 2122×3000 座標，扣除裁切偏移 SCAN 後逆時針轉 90 度成橫式）。
 執行：python3 tools/make_board_svg.py  → 輸出 board-sanguo.svg、board-shuihu.svg
@@ -62,7 +62,7 @@ COL = {'orange': '#ef5a28', 'blue': '#2f7fd8', 'yellow': '#f6d43a', 'green': '#3
 FONT = "'PingFang TC','Heiti TC','Microsoft JhengHei','Noto Sans TC',sans-serif"
 
 # 橫式棋盤（電腦版）：把直式掃描座標逆時針轉 90 度（起點移到左上角）
-# 直式棋盤（手機版）：保留原版掃描的直式方向，由 main(portrait=True) 切換
+# 直式棋盤（手機版）：保留掃描圖的直式方向，由 main(portrait=True) 切換
 PORTRAIT = False
 # 手機版：直式，格內文字放大（在手機寬度下不小於約 12pt），商店不畫品牌標誌，圖畫格加名稱橫幅
 MOBILE = False

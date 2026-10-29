@@ -211,10 +211,10 @@ function playerSheet(p) {
   if (p.rest) html += `<p>休息中，尚需休息 ${p.rest} 次</p>`;
   if (p.hand) {
     html += `<p><b>手牌（點牌看說明）</b></p><div class="cards">${p.hand.map(id => `<div class="copt"><span class="cw" data-cid="${id}"></span>${id === p.commander ? '<span class="cmdbadge">★主帥</span>' : ''}</div>`).join('')}</div>`;
-    if (p.reserve && p.reserve.length) html += `<p><b>錦囊保留卡</b>：${p.reserve.join('、')}</p>`;
+    if (p.reserve && p.reserve.length) html += `<p><b>保留卡</b>：${p.reserve.join('、')}</p>`;
   } else {
     html += `<p>主帥</p><div class="cards"><div class="copt"><span class="cw" data-cid="${p.commander}"></span>${p.hasCmd ? '' : '<span class="cmdbadge">不在手中</span>'}</div></div>`;
-    html += `<p>手牌 ${p.cardN} 張${p.reserveN ? `・錦囊保留卡 ${p.reserveN} 張` : ''}</p>`;
+    html += `<p>手牌 ${p.cardN} 張${p.reserveN ? `・保留卡 ${p.reserveN} 張` : ''}</p>`;
     if (p.known.length) html += `<p>你記得的牌：</p><div class="cards">${p.known.map(id => `<div class="copt"><span class="cw" data-cid="${id}"></span></div>`).join('')}</div>`;
   }
   infoSheet(p.name, html);

@@ -10,7 +10,7 @@ This folder is a WeChat mini game project. It runs the same rules engine as the 
 
 ## Phone layout
 
-- **Portrait board.** The original board is portrait, so the phone version keeps it upright and fits it to the screen width. On a 390-pt-wide phone (iPhone 12–16), city names come out at about 14–20 pt and square labels at 12–15 pt.
+- **Portrait board.** The board is drawn upright and fitted to the screen width. On a 390-pt-wide phone (iPhone 12–16), city names come out at about 14–20 pt and square labels at 12–15 pt.
 - **Phone-only board art** (`tools/make_board_svg.py --mobile`):
   - Labels are enlarged, and long names are shortened: 職業介紹所 → 介紹所, 緊急軍情 → 軍情, 商店街 → 商店.
   - Tiny captions such as 抽牌 and 古戰場 are dropped. Tap any square for its full details.

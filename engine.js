@@ -21,7 +21,7 @@ const GEN_BASE = 1000, SPECIAL_BASE = 500;        // 自訂：武將、特別卡
 
 const GROUPS = { orange: '橙色', blue: '藍色', magenta: '紫紅色', yellow: '黃色', green: '綠色', field: '古戰場' };
 
-/* ---- 棋盤：依原版路線（由此前進 → 官渡 → 回到起點）---- */
+/* ---- 棋盤：路線由起點出發，繞一圈回到起點 ---- */
 // 這裡只定義每一格的種類、地價、顏色與費用；格子名稱一律來自 themes.js（applyTheme 填入 n）
 const C = (p, g) => ({ t: 'city', p, g });
 const F = () => ({ t: 'field', p: 1000, g: 'field' });
@@ -512,7 +512,7 @@ async function encounter(p, i, o) {
       let use = true;
       if (!o.ai) {
         await handoff(o);
-        use = await ask(o, `${esc(o.name)}：敵軍攻城！`, `<p>${pname(p)} 進攻 ${tname(i)}。你持有錦囊保留卡<b>${sName('kongcheng')}</b>，可免除敵軍攻城一次並俘虜敵軍士兵 500 人。是否使用？</p>`,
+        use = await ask(o, `${esc(o.name)}：敵軍攻城！`, `<p>${pname(p)} 進攻 ${tname(i)}。你持有保留卡<b>${sName('kongcheng')}</b>，可免除敵軍攻城一次並俘虜敵軍士兵 500 人。是否使用？</p>`,
           [{ label: '不使用', value: false }, { label: `使用${sName('kongcheng')}`, value: true, cls: 'pri' }]);
       }
       if (use) {
@@ -847,7 +847,7 @@ async function playReserve(p, key, opts = {}) {
 }
 async function humanReserveMenu(p) {
   const keys = turnReserves(p);
-  const key = await choose(p, '使用錦囊保留卡', '選擇要使用的錦囊：', keys.map(k => ({ label: `<b>${sName(k)}</b>——${sDesc(k)}`, value: k })), '取消');
+  const key = await choose(p, '使用保留卡', '選擇要使用的保留卡：', keys.map(k => ({ label: `<b>${sName(k)}</b>——${sDesc(k)}`, value: k })), '取消');
   return key ? playReserve(p, key) : false;
 }
 async function aiReserves(p) {
@@ -929,7 +929,7 @@ async function showHand(p) {
   await handoff(p);
   const mem = others(p).map(q => `<li>${rememberText(p, q)}</li>`).join('');
   await ok(p, `${esc(p.name)} 的手牌`, `<div class="cards">${p.cards.map(id => `<div class="copt">${cimg(id)}${id === p.commander ? '<span class="cmdbadge">★主帥</span>' : ''}</div>`).join('')}</div>
-    ${p.reserve.length ? `<p><b>錦囊保留卡：</b>${p.reserve.map(k => `${STRATEGY[k].n}（${STRATEGY[k].s}）`).join('；')}</p>` : ''}
+    ${p.reserve.length ? `<p><b>保留卡：</b>${p.reserve.map(k => `${STRATEGY[k].n}（${STRATEGY[k].s}）`).join('；')}</p>` : ''}
     <p><b>你對其他人的記憶：</b></p><ul>${mem}</ul>`);
 }
 // 人類回合：等待擲骰，期間可使用錦囊、變賣資產、查看手牌。回傳 true 表示已用金蟬脫殼移動
