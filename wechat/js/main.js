@@ -565,6 +565,11 @@ function drawGame() {
       button(x, ay, unit * wgt, ah, label, { pri: act === 'roll', size: act === 'roll' ? 19 : SIZE.button, key: 'act', k, tap: () => app.turn && app.turn.resolve(act) });
       x += unit * wgt + gap;
     });
+  } else if (feedVisible()) {
+    // 棋盤上的消息框已在顯示這些消息，下方只留戰報入口，不重複顯示
+    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = font(SIZE.small, 700); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('查看戰報 ›', W / 2, ay + ah / 2); ctx.textAlign = 'left';
+    addHit({ x: 8, y: ay, w: W - 16, h: ah, tap: logSheet, key: 'log' });
   } else {
     fillR(ctx, 8, ay, W - 16, ah, 10, 'rgba(255,255,255,.9)', COLOR.line, 1);
     ctx.fillStyle = COLOR.ink; ctx.font = font(SIZE.small); ctx.textBaseline = 'middle';

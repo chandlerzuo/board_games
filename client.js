@@ -153,6 +153,8 @@ function feedTick() {
   const shown = FEED.items.filter(it => it.logged), last = FEED.items[FEED.items.length - 1];
   const el = $('#feed');
   const visible = el && shown.length && last && now <= last.t0 + last.dur + FEED.linger && shown.some(it => it.dur);
+  // 消息框顯示時，側欄上方的最新消息不重複顯示
+  $('#msg').style.visibility = visible ? 'hidden' : '';
   if (!visible) { if (el) el.hidden = true; if (!FEED.items.some(it => !it.logged)) { clearInterval(FEED.timer); FEED.timer = null; } else ensureFeedTimer(); return; }
   const reading = FEED.items.find(it => it.logged && now < it.t0 + it.dur);
   const cur = VIEW && VIEW.cur != null ? P(VIEW.cur) : null;

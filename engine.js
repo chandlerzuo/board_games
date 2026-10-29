@@ -216,7 +216,7 @@ function tollOf(i) {
   if (t.owner == null) return T.t === 'field' ? FIELD_TOLL[0] : CITY_TOLL[T.p][0];
   const o = P(t.owner);
   const base = T.t === 'field' ? FIELD_TOLL[Math.max(1, fieldsOwned(o)) - 1] : CITY_TOLL[T.p][t.level];
-  return ownsGroup(o, T.g) ? base * 2 : base; // 擁有同色全部領地者，過路稅加倍
+  return base; // 收齊同色全部領地即獲勝，所以不會有「同色加倍」的過路稅
 }
 const siegeNeed = i => TILES[i].t === 'field' ? 1000 : SIEGE_NEED[G.tiles[i].level];
 const tileValue = i => TILES[i].p + BUILD_COST * G.tiles[i].level;
@@ -481,7 +481,7 @@ async function encounter(p, i, o) {
   if (p.ai) choice = aiEncounter(p, i, o, toll, need);
   else {
     choice = await ask(p, `${T.n}（${esc(o.name)} 的領地）`,
-      `<p>${levelName(i)}・${GROUPS[T.g]}。${o.rest ? `${pname(o)} 休息中，不得收取過路稅。` : `過路稅：<b>${fmt(toll)}</b>${ownsGroup(o, T.g) ? '（同色全收，加倍）' : ''}。`}</p>
+      `<p>${levelName(i)}・${GROUPS[T.g]}。${o.rest ? `${pname(o)} 休息中，不得收取過路稅。` : `過路稅：<b>${fmt(toll)}</b>。`}</p>
        <p><b>武將單挑</b>：主要目的為避稅。對方可自由選擇是否出戰，不論勝負，本次過路稅皆不得收取。敗方武將被俘虜。</p>
        <p><b>攻城戰</b>：需 ${need} 名兵力（你有 ${p.troops} 名）。不論勝負，你損失 ${need} 名、對方損失 ${DEF_TROOPS} 名。獲勝即佔領 ${T.n}。</p>
        <p><small>${rememberText(p, o)}・兵力 ${o.troops}</small></p>${hasCard(p) ? '' : '<p class="err">你手上沒有牌，不能單挑或攻城（守方兵力不足時仍可佔領）。</p>'}`,
@@ -920,8 +920,8 @@ async function rollAndMove(p) {
   const r = roll(1), s = r[0]; // 全遊戲只用一顆骰子（1–6 點）
   await waitRead(); // 先讀完之前的消息
   showDice(r);
-  // 擲骰消息與旗幟移動同時進行：電腦的消息停留到旗幟走完
-  log(`${pname(p)} 擲出 ${s} 點。`, p.ai ? s * S.stepMs : undefined);
+  // 擲骰消息與旗幟移動同時進行：至少停留選定的閱讀時間，旗幟走得更久就停留到走完
+  log(`${pname(p)} 擲出 ${s} 點。`, p.ai ? Math.max(S.readMs, s * S.stepMs) : undefined);
   await move(p, s, false, true);
   await land(p);
 }

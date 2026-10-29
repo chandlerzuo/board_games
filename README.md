@@ -2,7 +2,7 @@
 
 以三國、水滸、封神、西遊、楚漢為題材的回合制策略棋盤遊戲。擲骰行軍，購置領地、建設城池，招募武將單挑攻城，善用錦囊妙計扭轉戰局。支援2至4人同機對戰或挑戰電腦，率先佔領二十處領地者一統天下。
 
-A property-and-siege board game in the style of the original *三國風雲*. It recreates the original board, rule book, poker cards, event cards and territory deeds, and can be played in several themes. The repository folder is `board_games`.
+A property-and-siege board game with a board, rule book, poker cards, event cards and territory deeds, playable in several themes. The repository folder is `board_games`.
 
 ## Themes
 
