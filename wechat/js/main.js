@@ -281,9 +281,10 @@ function drawSetup() {
   keys.forEach((k, j) => {
     const T = E.THEMES[k], tx = x0 + (j % cols) * (tw + gap), ty = y + Math.floor(j / cols) * (tH + gap), on = k === setup.theme;
     const y_ = y; y = ty; // 以下沿用 y 為這一格的上緣
-    fillR(ctx, tx, y, tw, tH, 12, on ? '#fff8e1' : '#fff', on ? COLOR.pri : COLOR.line, on ? 3 : 1.5);
-    const bh = tH - 30, bw = Math.min(tw - 16, bh * 0.72);
-    drawBook(ctx, tx + (tw - bw) / 2, y + 8, bw, bh, T.label, BOOK_COLOR[k] || '#3b4a5a');
+    // 不畫底框；選中的書加紅色外框
+    const bh = tH - 30, bw = Math.min(tw - 16, bh * 0.72), bx = tx + (tw - bw) / 2;
+    if (on) fillR(ctx, bx - 5, y + 3, bw + 10, bh + 10, 8, null, COLOR.pri, 3);
+    drawBook(ctx, bx, y + 8, bw, bh, T.label, BOOK_COLOR[k] || '#3b4a5a');
     if (on) { ctx.fillStyle = COLOR.pri; ctx.font = font(SIZE.tiny, 700); ctx.textAlign = 'center'; ctx.fillText('✓ 已選擇', tx + tw / 2, y + tH - 11); ctx.textAlign = 'left'; }
     addHit({ x: tx, y, w: tw, h: tH, tap: () => { setup.theme = k; useTheme(k); saveSetup(); } });
     y = y_;
