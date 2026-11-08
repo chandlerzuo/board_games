@@ -13,6 +13,7 @@ private.key
 private.*.key
 *.key
 *.pem
-tools/ci-upload/private.keydist/
+tools/ci-upload/private.key
+dist/
 *.tar.gz
 *.tgz
