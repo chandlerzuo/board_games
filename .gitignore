@@ -13,4 +13,4 @@ private.key
 private.*.key
 *.key
 *.pem
-tools/ci-upload/private.key
+tools/ci-upload/private.keydist/

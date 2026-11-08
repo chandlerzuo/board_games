@@ -65,7 +65,25 @@ The game engine runs on the server, and each browser receives only that player's
 
 This version has no login. The per-tab seat code only links a browser tab to a seat; it does not prove who someone is. The server therefore refuses to listen on anything other than `127.0.0.1` / `::1` / `localhost` (setting `SANGUO_HOST=0.0.0.0` makes it exit with an error).
 
-### Before friends on other computers can join
+### Host it next to guandan on a Tencent Cloud server
+
+`deploy/` adds this game to a Lighthouse machine that already runs [guandan](../guandan) with its HTTPS + shared-password nginx (`setup_lighthouse.sh --public`). It reuses that nginx certificate and login, so one password protects both games, and it never makes a password of its own: if guandan's login isn't set up, it stops.
+
+```sh
+deploy/make_bundle.sh                        # on your computer, from a committed checkout → dist/board_games-<rev>.tar.gz
+scp dist/board_games-<rev>.tar.gz ubuntu@<server-ip>:~
+# on the server
+tar xzf board_games-<rev>.tar.gz && sudo bash board_games-<rev>/deploy/setup_tencent.sh
+```
+
+- **What it sets up:** Node.js 18+ if missing; the game in `/opt/board_games`, read-only to the service; a hardened systemd service `boardgames`, running as its own user and listening on `127.0.0.1:8765` only; and one extra nginx HTTPS port (default `8443`, `--port` to change) in front of it, with the login in place before the game starts.
+- **What it checks before it says "done":** the game listens on loopback only, and anonymous requests to the page and the API get `401` with a login prompt. If anything fails it closes the public port again and stops.
+- **By hand, in the Lighthouse firewall:** allow TCP `8443` (from anywhere, or only your friends' CIDR ranges such as `203.0.113.0/24`). Never open `8765`. Keep SSH limited to your IP.
+- **Upgrade:** build a new bundle, copy it over, and run the script again. **Remove:** `sudo bash .../deploy/setup_tencent.sh --remove`, then delete the firewall rule.
+- **Limits:** the login is guandan's one shared password, not a per-person account. Anyone who has it can sit at any open seat and run the lobby, so share it only with people you want at the table. There is one lobby, so one game runs at a time. A mainland-China server may need an ICP filing for public access (see guandan's `docs/DEPLOY.md`). The browser shows a certificate warning once for this port.
+- **Not tried on a real server yet:** `deploy/setup_tencent.sh` has been syntax-checked, and the bundle has been unpacked and served locally, but the script itself has not been run on a Lighthouse machine.
+
+### Before friends on other computers can join (without that server)
 
 1. **Host it on a personal account, not a corporate machine.** For example a personal cloud account or a hosting service that runs Node.js. Do not expose it from a work laptop or Cloud Desktop.
 2. **Add a real sign-in** from the hosting platform or an identity provider (for example "Sign in with Google"), so each seat is tied to a verified account. Do not use home-made passwords or shared room codes.
