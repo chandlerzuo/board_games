@@ -92,6 +92,9 @@ if [ "$(node_major)" -lt 18 ]; then
 fi
 [ "$(node_major)" -ge 18 ] || die "Node.js 18 or later is needed (apt installed $(node -v 2>/dev/null || echo none)); install a newer Node.js and run again"
 NODE=$(readlink -f "$(command -v node)")
+case "$NODE" in   # the sandboxed service cannot read home directories (ProtectHome=yes)
+  /home/*|/root/*|/run/user/*) die "node is at $NODE, which the service cannot read; install Node.js system-wide (sudo apt install nodejs) and run again" ;;
+esac
 
 echo "==> files"
 id "$SVC" >/dev/null 2>&1 || useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$SVC"
@@ -162,6 +165,8 @@ User=$SVC
 Group=$SVC
 Environment=SANGUO_HOST=127.0.0.1
 Environment=SANGUO_PORT=$APP_PORT
+# Node's I/O library tries io_uring, which the call filter below blocks; turn it off
+Environment=UV_USE_IO_URING=0
 ExecStart=$NODE $APP/server/server.js
 Restart=on-failure
 RestartSec=3
@@ -179,6 +184,8 @@ RestrictNamespaces=yes
 LockPersonality=yes
 CapabilityBoundingSet=
 SystemCallFilter=@system-service
+# a blocked call returns an error instead of killing Node (newer libuv tries io_uring and falls back)
+SystemCallErrorNumber=EPERM
 MemoryMax=400M
 
 [Install]
@@ -199,7 +206,11 @@ fail_closed() {   # close the public port again, then stop
   systemctl stop "$SVC" || true
   die "$1 (the public port has been closed again)"
 }
-[ -n "$OK" ] || fail_closed "the game is not listening on port $APP_PORT (logs: journalctl -u $SVC)"
+if [ -z "$OK" ]; then
+  echo "--- systemctl status $SVC" >&2; systemctl status "$SVC" --no-pager -l 2>&1 | tail -n 15 >&2 || true
+  echo "--- journalctl -u $SVC" >&2; journalctl -u "$SVC" -n 25 --no-pager 2>&1 >&2 || true
+  fail_closed "the game is not listening on port $APP_PORT (see the log above)"
+fi
 # The game must listen on loopback only.
 while read -r addr; do
   [ "$addr" = "127.0.0.1:$APP_PORT" ] || fail_closed "unexpected listener $addr (expected 127.0.0.1:$APP_PORT)"
