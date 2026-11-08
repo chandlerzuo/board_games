@@ -1,12 +1,16 @@
 'use strict';
 /* 三國風雲　連線伺服器（Node.js，無外部套件）
  *
- * 遊戲引擎在伺服器執行；每位玩家的瀏覽器只會收到「自己眼中的局面」與自己的題目，
+ * 四張桌子，每張桌子有自己的座位、大廳與牌局。玩家可以入座後等朋友加入，或用電腦補滿空位開局；
+ * 牌局中隨時可以離座，該座位由電腦接手；真人全部離座時牌局結束、桌子重新開放。
+ *
+ * 每一局在自己的 worker 執行緒中執行一份獨立的規則引擎（見 game_worker.js）：引擎把一局的狀態放在
+ * 模組變數裡，同一個行程裡無法同時進行四局。每位玩家的瀏覽器只會收到「自己眼中的局面」與自己的題目，
  * 因此他人的手牌不會傳到你的瀏覽器。
  *
- * 安全：本版本只供本機測試，只接受 127.0.0.1／::1／localhost。
+ * 安全：本程式沒有自己的登入，只接受 127.0.0.1／::1／localhost。
  * 座位代碼（token）只用來把瀏覽器分頁對應到座位，不是登入驗證；
- * 要讓其他電腦的朋友加入，必須先部署到個人主機並接上正式的登入服務（見 README.md）。
+ * 要讓其他電腦的朋友加入，必須放在有登入的 HTTPS 反向代理後面（見 README.md 的 deploy/）。
  *
  * 執行：node server/server.js　（可用 SANGUO_PORT 改埠號，預設 8765）
  */
@@ -14,8 +18,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const E = require('../engine.js');
-const { makeForm } = require('./form.js');
+const { Worker } = require('worker_threads');
+const E = require('../engine.js');   // 只用主題與速度設定；牌局在 worker 中執行
 
 const HOST = process.env.SANGUO_HOST || '127.0.0.1';
 const PORT = +process.env.SANGUO_PORT || 8765;
@@ -44,82 +48,135 @@ for (const th of Object.values(E.THEMES)) {
   if (fs.existsSync(path.join(ROOT, art))) FILES['/' + art] = [art, 'text/javascript; charset=utf-8'];
 }
 
-/* ---- 大廳與連線 ---- */
-const NSEATS = 4;
-const lobby = { seats: Array.from({ length: NSEATS }, () => ({ state: 'open' })), host: null, speed: 450, theme: 'sanguo', started: false };
-const clients = new Set(); // { res, token }
-let game = null;           // { seatOf: 座位→引擎玩家 id, pending: Map, logs: [], over }
+/* ---- 桌子與連線 ---- */
+const NTABLES = 4, NSEATS = 4;
+const GRACE_MS = +process.env.SANGUO_GRACE_MS || 90000;   // 斷線超過這段時間，座位改由電腦接手（或釋出）
+const newTable = id => ({ id, seats: Array.from({ length: NSEATS }, () => ({ state: 'open' })), host: null, speed: 450, theme: 'sanguo', started: false, game: null });
+const tables = Array.from({ length: NTABLES }, (_, id) => newTable(id));
+const clients = new Set();   // { res, token, table: 桌號或 null }
+// table.game：{ seatOf: 座位→引擎玩家 id, pending: Map, logs, over, views, worker, waiters }
 
-const seatByToken = t => t ? lobby.seats.findIndex(s => s.token === t) : -1;
+const find = token => {   // 這個座位代碼坐在哪一桌哪一個座位
+  if (!token) return null;
+  for (const t of tables) { const k = t.seats.findIndex(s => s.token === token); if (k >= 0) return { t, k }; }
+  return null;
+};
 const online = token => [...clients].some(c => c.token === token);
-function send(c, msg) { c.res.write(`data: ${JSON.stringify(msg)}\n\n`); }
-function lobbyFor(token) {
-  const mySeat = seatByToken(token);
+function send(c, msg) { try { c.res.write(`data: ${JSON.stringify(msg)}\n\n`); } catch (e) { /* 連線已斷 */ } }
+const sendTable = (t, msg) => clients.forEach(c => { if (c.table === t.id) send(c, msg); });
+const sendPid = (t, pid, msg) => clients.forEach(c => {
+  const me = c.table === t.id && find(c.token);
+  if (me && me.t === t && t.game && t.game.seatOf[me.k] === pid) send(c, msg);
+});
+
+function lobbyFor(t, token) {
+  const me = find(token), mine = me && me.t === t ? me.k : -1;
   return {
-    type: 'lobby',
-    lobby: { started: lobby.started, speed: lobby.speed, theme: lobby.theme,
-      seats: lobby.seats.map(s => ({ state: s.state, cmd: s.cmd, mine: !!token && s.token === token, host: !!s.token && s.token === lobby.host, online: s.state !== 'human' || online(s.token) })) },
-    you: { seat: mySeat >= 0 ? mySeat : null, host: !!token && token === lobby.host },
+    type: 'lobby', table: t.id,
+    lobby: { started: t.started, speed: t.speed, theme: t.theme,
+      seats: t.seats.map((s, k) => ({ state: s.state, cmd: s.cmd, mine: k === mine, host: !!s.token && s.token === t.host, online: s.state !== 'human' || online(s.token) })) },
+    you: { seat: mine >= 0 ? mine : null, host: mine >= 0 && token === t.host },
   };
 }
-const broadcastLobby = () => clients.forEach(c => send(c, lobbyFor(c.token)));
-// 引擎玩家 id（只有已開局才有）
-const pidOf = token => { const s = seatByToken(token); return game && s >= 0 ? game.seatOf[s] : undefined; };
+const summary = t => ({ id: t.id, started: t.started, over: !!(t.game && t.game.over), theme: t.theme,
+  seats: t.seats.map(s => ({ state: s.state, cmd: s.cmd, online: s.state !== 'human' || online(s.token) })) });
+const tablesFor = token => { const me = find(token); return { type: 'tables', tables: tables.map(summary), you: me ? { table: me.t.id, seat: me.k } : null }; };
+function broadcastLobby(t) {
+  if (t) clients.forEach(c => { if (c.table === t.id) send(c, lobbyFor(t, c.token)); });
+  clients.forEach(c => send(c, tablesFor(c.token)));
+}
+const broadcastAll = () => { tables.forEach(t => clients.forEach(c => { if (c.table === t.id) send(c, lobbyFor(t, c.token)); })); clients.forEach(c => send(c, tablesFor(c.token))); };
 
-/* ---- 連線版 UI 轉接器 ---- */
-let renderQueued = false;
-function sendViews() {
-  renderQueued = false;
-  if (!game) return;
-  for (const c of clients) {
-    const pid = pidOf(c.token);
-    send(c, { type: 'view', view: E.viewFor(pid ?? 'all') });
+// 這位用戶在這一桌看到的局面：自己的視角（真人）或旁觀視角
+function viewFor(t, token) {
+  const g = t.game;
+  if (!g || !g.views) return null;
+  const me = find(token), pid = me && me.t === t ? g.seatOf[me.k] : undefined;
+  return (pid != null && g.views.byPid[pid]) || g.views.all;
+}
+
+/* ---- 牌局（每桌一個 worker） ---- */
+function startGame(t) {
+  const seated = t.seats.map((s, k) => ({ s, k })).filter(x => x.s.state !== 'open');
+  const g = t.game = { seatOf: {}, pending: new Map(), logs: [], over: null, views: null, worker: null, waiters: new Map() };
+  seated.forEach((x, pid) => { g.seatOf[x.k] = pid; });
+  t.started = true;
+  const worker = g.worker = new Worker(path.join(__dirname, 'game_worker.js'), {
+    workerData: {
+      seats: seated.map(x => ({ ai: x.s.state === 'ai', cmd: x.s.cmd })),
+      humanPids: seated.map((x, pid) => (x.s.state === 'human' ? pid : -1)).filter(pid => pid >= 0),
+      opts: { aiDelay: t.speed, ...E.PACE[t.speed], theme: t.theme },
+    },
+    resourceLimits: { maxOldGenerationSizeMb: 128 },
+  });
+  worker.on('message', m => onWorker(t, g, m));
+  worker.on('error', err => crashed(t, g, err));
+  worker.on('exit', () => { if (g.worker === worker) g.worker = null; });
+  broadcastLobby(t);
+}
+function onWorker(t, g, m) {
+  if (t.game !== g) return;   // 這一局已經結束或換桌
+  switch (m.t) {
+    case 'views':
+      g.views = m;
+      clients.forEach(c => { if (c.table === t.id) { const v = viewFor(t, c.token); if (v) send(c, { type: 'view', view: v }); } });
+      break;
+    case 'log': g.logs.push(m.html); if (g.logs.length > 400) g.logs.shift(); sendTable(t, { type: 'log', html: m.html, meta: m.meta }); break;
+    case 'dice': sendTable(t, { type: 'dice', r: m.r }); break;
+    case 'flash': sendTable(t, { type: 'flash', k: m.k }); break;
+    case 'ask': case 'turn': g.pending.set(m.id, { id: m.id, pid: m.pid, msg: m.msg }); sendPid(t, m.pid, m.msg); break;
+    case 'resolved': g.pending.delete(m.id); break;
+    case 'answered': { const w = g.waiters.get(m.rid); if (w) { g.waiters.delete(m.rid); w(m); } break; }
+    case 'over':
+      g.over = { type: 'over', title: m.title, html: m.html };
+      g.pending.clear();
+      sendTable(t, g.over);
+      setImmediate(() => { if (g.worker) g.worker.terminate(); });
+      broadcastLobby(null);
+      break;
+    case 'crash': crashed(t, g, new Error(m.message)); break;
   }
 }
-function pendingFor(pid) { return [...game.pending.values()].filter(q => q.pid === pid); }
-function sendPending(c) {
-  const pid = pidOf(c.token);
-  if (pid == null) return;
-  for (const q of pendingFor(pid)) send(c, q.msg);
+function crashed(t, g, err) {
+  if (t.game !== g || g.over) return;
+  console.error(`第 ${t.id + 1} 桌的牌局發生錯誤：`, err);
+  g.over = { type: 'over', title: '遊戲中止', html: '<p>伺服器發生錯誤，本局中止。</p>' };
+  g.pending.clear();
+  sendTable(t, g.over);
+  if (g.worker) g.worker.terminate();
+  broadcastLobby(null);
 }
-const toSeat = (pid, msg) => clients.forEach(c => { if (pidOf(c.token) === pid) send(c, msg); });
-const broadcast = msg => clients.forEach(c => send(c, msg));
-const netUI = {
-  sleep: ms => new Promise(r => setTimeout(r, ms)),
-  // meta：電腦回合消息的停留時間（{ dur, wait }，毫秒），畫面據此逐條顯示
-  log: (html, meta) => { game.logs.push(html); if (game.logs.length > 400) game.logs.shift(); broadcast({ type: 'log', html, meta }); },
-  render: () => { if (!renderQueued) { renderQueued = true; setImmediate(sendViews); } },
-  dice: r => broadcast({ type: 'dice', r }),
-  flash: k => broadcast({ type: 'flash', k }),
-  handoff: async () => {},
-  ask: (p, title, body, buttons) => new Promise(resolve => {
-    const id = crypto.randomUUID();
-    const msg = { type: 'ask', id, title, body, buttons: buttons.map(b => ({ label: b.label, cls: b.cls, disabled: !!b.disabled })) };
-    game.pending.set(id, { id, pid: p.id, msg, buttons, resolve });
-    toSeat(p.id, msg);
-  }),
-  turn: (p, opts) => new Promise(resolve => {
-    const id = crypto.randomUUID();
-    const msg = { type: 'turn', id, opts };
-    game.pending.set(id, { id, pid: p.id, msg, turn: true, resolve });
-    toSeat(p.id, msg);
-  }),
-  gameOver: (w, html) => {
-    game.over = { type: 'over', title: w ? '🏆 勝利' : '遊戲結束', html };
-    netUI.render();
-    setImmediate(() => broadcast(game.over));
-  },
+function stopGame(t) { if (t.game && t.game.worker) t.game.worker.terminate(); }
+
+// 桌子恢復成全空、等待新玩家的狀態
+function emptyTable(t) {
+  stopGame(t);
+  Object.assign(t, newTable(t.id));
+  sendTable(t, { type: 'reset' });
+  broadcastLobby(t);
+}
+const ensureHost = t => {
+  if (t.host && t.seats.some(s => s.token === t.host)) return;
+  const h = t.seats.find(s => s.state === 'human');
+  t.host = h ? h.token : null;
 };
 
-function startGame() {
-  const seated = lobby.seats.map((s, k) => ({ s, k })).filter(x => x.s.state !== 'open');
-  game = { seatOf: {}, pending: new Map(), logs: [], over: null };
-  seated.forEach((x, pid) => { game.seatOf[x.k] = pid; });
-  lobby.started = true;
-  E.newGame(seated.map(x => ({ ai: x.s.state === 'ai', cmd: x.s.cmd })), { aiDelay: lobby.speed, ...E.PACE[lobby.speed], theme: lobby.theme }, netUI);
-  broadcastLobby();
-  sendViews();
-  E.gameLoop().catch(err => { console.error('遊戲錯誤：', err); netUI.log('（伺服器錯誤，本局中止）'); });
+// 離座：開局前就是空出座位；牌局中該座位改由電腦接手；真人全部離開時整桌重置
+function leave(token) {
+  const me = find(token);
+  if (!me) return false;
+  const { t, k } = me, s = t.seats[k];
+  if (t.started && t.game && !t.game.over) {
+    const pid = t.game.seatOf[k];
+    t.seats[k] = { state: 'ai', cmd: s.cmd };
+    for (const [id, q] of t.game.pending) if (q.pid === pid) t.game.pending.delete(id);
+    if (t.game.worker) t.game.worker.postMessage({ t: 'standup', pid });
+  } else {
+    t.seats[k] = { state: 'open' };
+  }
+  ensureHost(t);
+  if (!t.seats.some(x => x.state === 'human')) emptyTable(t); else broadcastLobby(t);
+  return true;
 }
 
 /* ---- HTTP ---- */
@@ -131,108 +188,125 @@ function readJson(req) {
   });
 }
 function json(res, code, obj) { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); }
+const freeCmd = t => [0, 1, 2, 3].filter(c => !t.seats.some(s => s.state !== 'open' && s.cmd === c));
 
 async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/events') {
     const token = url.searchParams.get('token') || '';
+    const me = find(token);
+    const tp = url.searchParams.get('table') || '';
+    let table = /^[0-9]+$/.test(tp) && +tp < NTABLES ? +tp : null;   // table=none：只看桌位列表
+    if (me) table = me.t.id;                                          // 已入座者一律綁在自己的桌子上，才收得到自己的題目
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
-    const c = { res, token: seatByToken(token) >= 0 ? token : '' };
+    const c = { res, token: me ? token : '', table };
     clients.add(c);
-    send(c, lobbyFor(c.token));
-    if (game) {
-      game.logs.forEach(html => send(c, { type: 'log', html }));
-      send(c, { type: 'view', view: E.viewFor(pidOf(c.token) ?? 'all') });
-      sendPending(c);
-      if (game.over) send(c, game.over);
+    send(c, tablesFor(c.token));
+    if (table != null) {
+      const t = tables[table];
+      send(c, lobbyFor(t, c.token));
+      const g = t.game;
+      if (g) {
+        g.logs.forEach(html => send(c, { type: 'log', html }));
+        const v = viewFor(t, c.token);
+        if (v) send(c, { type: 'view', view: v });
+        const m = find(c.token), pid = m && m.t === t ? g.seatOf[m.k] : undefined;
+        if (pid != null) for (const q of g.pending.values()) if (q.pid === pid) send(c, q.msg);   // 重新連線時補送未答的題目
+        if (g.over) send(c, g.over);
+      }
     }
-    broadcastLobby();
+    broadcastAll();
     const ping = setInterval(() => res.write(': ping\n\n'), 25000);
-    req.on('close', () => { clearInterval(ping); clients.delete(c); broadcastLobby(); });
+    req.on('close', () => {
+      clearInterval(ping); clients.delete(c);
+      if (c.token && find(c.token)) {   // 斷線太久就視為離座
+        const timer = setTimeout(() => { if (find(c.token) && !online(c.token)) leave(c.token); }, GRACE_MS);
+        if (timer.unref) timer.unref();
+      }
+      broadcastAll();
+    });
     return;
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method' });
   let body;
   try { body = await readJson(req); } catch { return json(res, 400, { error: '格式錯誤' }); }
   const token = typeof body.token === 'string' ? body.token : '';
-  const seat = seatByToken(token);
+  const me = find(token);
 
   if (url.pathname === '/api/join') {
-    const k = body.seat, cmd = body.cmd;
-    if (lobby.started) return json(res, 409, { error: '遊戲已經開始' });
-    if (seat >= 0) return json(res, 409, { error: '你已經有座位了' });
-    if (!Number.isInteger(k) || !lobby.seats[k] || lobby.seats[k].state !== 'open') return json(res, 409, { error: '這個座位已有人' });
-    if (!Number.isInteger(cmd) || cmd < 0 || cmd > 3 || lobby.seats.some(s => s.state !== 'open' && s.cmd === cmd)) return json(res, 409, { error: '這位主帥已被選走' });
-    const t = crypto.randomBytes(16).toString('hex');
-    lobby.seats[k] = { state: 'human', cmd, token: t };
-    if (!lobby.host || seatByToken(lobby.host) < 0) lobby.host = t;
-    broadcastLobby();
-    return json(res, 200, { token: t });
+    const t = Number.isInteger(body.table) ? tables[body.table] : null, k = body.seat, cmd = body.cmd;
+    if (!t) return json(res, 400, { error: '桌號錯誤' });
+    if (t.started) return json(res, 409, { error: '遊戲已經開始' });
+    if (me) return json(res, 409, { error: '你已經有座位了' });
+    if (!Number.isInteger(k) || !t.seats[k] || t.seats[k].state !== 'open') return json(res, 409, { error: '這個座位已有人' });
+    if (!freeCmd(t).includes(cmd)) return json(res, 409, { error: '這位主帥已被選走' });
+    const tk = crypto.randomBytes(16).toString('hex');
+    t.seats[k] = { state: 'human', cmd, token: tk };
+    if (!t.host || !t.seats.some(s => s.token === t.host)) t.host = tk;
+    broadcastLobby(t);
+    return json(res, 200, { token: tk, table: t.id });
+  }
+
+  if (url.pathname === '/api/leave') {
+    leave(token);
+    return json(res, 200, { ok: true });
   }
 
   if (url.pathname === '/api/lobby') {
-    const isHost = !!token && token === lobby.host && seat >= 0;
-    const op = body.op;
+    if (!me) return json(res, 403, { error: '請先入座' });
+    const t = me.t, isHost = token === t.host, op = body.op;
     if (op === 'reset') {
       // 遊戲結束後任何已入座的玩家都可回到大廳（避免房主離開後卡住）
-      if (seat < 0 || !(game && game.over)) return json(res, 403, { error: '遊戲結束後才能開新局' });
-      game = null; lobby.started = false;
-      broadcast({ type: 'reset' }); broadcastLobby();
+      if (!(t.game && t.game.over)) return json(res, 403, { error: '遊戲結束後才能開新局' });
+      stopGame(t);
+      t.game = null; t.started = false;
+      ensureHost(t);
+      sendTable(t, { type: 'reset' });
+      if (!t.seats.some(s => s.state === 'human')) emptyTable(t); else broadcastLobby(t);
       return json(res, 200, { ok: true });
     }
-    if (lobby.started) return json(res, 409, { error: '遊戲已經開始' });
+    if (t.started) return json(res, 409, { error: '遊戲已經開始' });
     const k = body.seat;
-    if (op === 'open') {
-      if (!lobby.seats[k]) return json(res, 400, { error: '座位錯誤' });
-      const s = lobby.seats[k];
-      if (!(s.token && s.token === token) && !(isHost && s.state === 'ai')) return json(res, 403, { error: '無權變更此座位' });
-      lobby.seats[k] = { state: 'open' };
-      if (s.token && s.token === lobby.host) { const h = lobby.seats.find(x => x.state === 'human'); lobby.host = h ? h.token : null; }
+    if (op === 'open') {   // 房主移除電腦座位
+      const s = t.seats[k];
+      if (!isHost || !s || s.state !== 'ai') return json(res, 403, { error: '無權變更此座位' });
+      t.seats[k] = { state: 'open' };
     } else if (op === 'ai') {
       if (!isHost) return json(res, 403, { error: '只有房主可設定電腦' });
-      const cmd = body.cmd;
-      if (!lobby.seats[k] || lobby.seats[k].state !== 'open') return json(res, 409, { error: '座位不是空的' });
-      if (!Number.isInteger(cmd) || cmd < 0 || cmd > 3 || lobby.seats.some(s => s.state !== 'open' && s.cmd === cmd)) return json(res, 409, { error: '沒有可用的主帥' });
-      lobby.seats[k] = { state: 'ai', cmd };
+      if (!t.seats[k] || t.seats[k].state !== 'open') return json(res, 409, { error: '座位不是空的' });
+      if (!freeCmd(t).includes(body.cmd)) return json(res, 409, { error: '沒有可用的主帥' });
+      t.seats[k] = { state: 'ai', cmd: body.cmd };
+    } else if (op === 'fillai') {   // 空位全部由電腦補上
+      if (!isHost) return json(res, 403, { error: '只有房主可設定電腦' });
+      t.seats.forEach((s, j) => { if (s.state === 'open') { const c = freeCmd(t)[0]; if (c != null) t.seats[j] = { state: 'ai', cmd: c }; } });
     } else if (op === 'theme') {
       if (!isHost) return json(res, 403, { error: '只有房主可選擇主題' });
       if (!Object.hasOwn(E.THEMES, body.theme)) return json(res, 400, { error: '未知的主題' });
-      lobby.theme = body.theme;
+      t.theme = body.theme;
     } else if (op === 'start') {
       if (!isHost) return json(res, 403, { error: '只有房主可開始遊戲' });
-      if (lobby.seats.filter(s => s.state !== 'open').length < 2) return json(res, 409, { error: '至少需要 2 位' });
-      lobby.speed = [120, 450, 900].includes(+body.speed) ? +body.speed : 450;
-      if (Object.hasOwn(E.THEMES, body.theme)) lobby.theme = body.theme;
-      startGame();
+      if (t.seats.filter(s => s.state !== 'open').length < 2) return json(res, 409, { error: '至少需要 2 位（可把空位設為電腦）' });
+      t.speed = [120, 450, 900].includes(+body.speed) ? +body.speed : 450;
+      if (Object.hasOwn(E.THEMES, body.theme)) t.theme = body.theme;
+      startGame(t);
       return json(res, 200, { ok: true });
     } else return json(res, 400, { error: '未知的操作' });
-    broadcastLobby();
+    broadcastLobby(t);
     return json(res, 200, { ok: true });
   }
 
   if (url.pathname === '/api/answer') {
-    const pid = pidOf(token);
-    const q = game && game.pending.get(body.id);
-    if (pid == null || !q || q.pid !== pid) return json(res, 403, { error: '這題不是給你的' });
-    if (q.turn) {
-      if (!['roll', 'reserve', 'sell', 'hand'].includes(body.btn)) return json(res, 400, { error: '未知的動作' });
-      game.pending.delete(q.id); q.resolve(body.btn);
-      return json(res, 200, { ok: true });
-    }
-    const b = q.buttons[body.btn];
-    if (!b || b.disabled) return json(res, 400, { error: '按鈕錯誤' });
-    let v = b.value;
-    if (typeof v === 'function') {
-      const inputs = Array.isArray(body.inputs) ? body.inputs.slice(0, 200).map(i => ({
-        id: typeof i.id === 'string' ? i.id : undefined, name: typeof i.name === 'string' ? i.name : undefined,
-        type: typeof i.type === 'string' ? i.type : undefined, value: String(i.value ?? '').slice(0, 40), checked: !!i.checked,
-        k: typeof i.k === 'string' ? i.k : undefined })) : [];
-      const form = makeForm(inputs);
-      try { v = v(form); } catch (e) { return json(res, 400, { error: '表單錯誤' }); }
-      if (v === undefined) return json(res, 200, { errors: form.errors });
-    }
-    game.pending.delete(q.id);
-    q.resolve(v);
-    return json(res, 200, { ok: true });
+    const g = me && me.t.game;
+    const pid = g ? g.seatOf[me.k] : undefined;
+    const q = g && g.pending.get(body.id);
+    if (!g || g.over || pid == null || !q || q.pid !== pid || !g.worker) return json(res, 403, { error: '這題不是給你的' });
+    const rid = crypto.randomUUID();
+    const result = await new Promise(resolve => {
+      g.waiters.set(rid, resolve);
+      setTimeout(() => { if (g.waiters.delete(rid)) resolve({ ok: false, error: '逾時' }); }, 10000);
+      g.worker.postMessage({ t: 'answer', id: body.id, btn: body.btn, inputs: body.inputs, rid });
+    });
+    if (result.errors) return json(res, 200, { errors: result.errors });
+    return json(res, result.ok ? 200 : 400, result.ok ? { ok: true } : { error: result.error || '失敗' });
   }
   return json(res, 404, { error: 'not found' });
 }
@@ -251,4 +325,7 @@ const server = http.createServer((req, res) => {
     res.end(data);
   });
 });
-server.listen(PORT, HOST, () => console.log(`三國風雲連線伺服器：http://${HOST === '::1' ? '[::1]' : HOST}:${PORT}/（只限本機）`));
+server.listen(PORT, HOST, () => console.log(`三國風雲連線伺服器：http://${HOST === '::1' ? '[::1]' : HOST}:${PORT}/（只限本機，${NTABLES} 桌）`));
+const shutdown = () => { tables.forEach(stopGame); process.exit(0); };
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

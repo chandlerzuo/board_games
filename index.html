@@ -14,8 +14,18 @@
   button.pri:hover:not(:disabled) { background: #a93226; }
 
   /* 設定畫面 */
-  #setup, #lobby { max-width: 760px; margin: 30px auto; background: #fbf3d5; border-radius: 12px; padding: 24px 32px; box-shadow: 0 8px 30px #0008; }
-  #lobby h1 { margin: 0 0 4px; font-size: 32px; color: #8b1e1e; letter-spacing: 4px; }
+  #setup, #lobby, #tables { max-width: 760px; margin: 30px auto; background: #fbf3d5; border-radius: 12px; padding: 24px 32px; box-shadow: 0 8px 30px #0008; }
+  #lobby h1, #tables h1 { margin: 0 0 4px; font-size: 32px; color: #8b1e1e; letter-spacing: 4px; }
+  #tables .row { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
+  /* 桌位列表 */
+  #tableCards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 14px 0; }
+  .tcard { border: 2px solid #c9a96e; border-radius: 10px; background: #fff8e1; padding: 12px 14px; }
+  .tcard h3 { margin: 0 0 4px; font-size: 20px; }
+  .tcard .st { font-size: 14px; color: #6b4f2a; margin-bottom: 8px; }
+  .tseats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; min-height: 28px; }
+  .tseat { padding: 2px 9px; border-radius: 12px; font-size: 14px; border: 1px solid #c9a96e; background: #fff; }
+  .tseat.human { background: #dff0d8; } .tseat.ai { background: #e8eaf6; } .tseat.open { color: #999; border-style: dashed; }
+  @media (max-width: 640px) { #tableCards { grid-template-columns: 1fr; } }
   #lobby .row, #lobby fieldset { margin: 8px 0; }
   #lobby fieldset { border: 1px solid #c9a96e; border-radius: 8px; }
   #lobby .row { display: flex; gap: 10px; align-items: center; }
@@ -138,23 +148,30 @@
   <div id="setupErr" class="err"></div>
 </div>
 
+<div id="tables" hidden>
+  <h1>英雄擲天下　連線大廳</h1>
+  <div>共 4 桌。選一桌入座，可以等朋友加入，也可以用電腦補滿空位直接開局；牌局中隨時可以離座，由電腦接手；真人全部離座後牌局結束，桌子重新開放。</div>
+  <div id="tableCards"></div>
+  <div class="row"><button id="rulesBtn2">遊戲說明</button><span class="netStatus err"></span></div>
+</div>
+
 <div id="lobby" hidden>
-  <h1><span class="themeTitle">三國風雲</span>　連線大廳</h1>
-  <div>選一個空位和主帥加入。第一位加入的人是房主，可以把空位設為電腦並開始遊戲。</div>
+  <h1><span class="themeTitle">三國風雲</span>　第 <span id="lobbyNo">1</span> 桌</h1>
+  <div>選一個空位和主帥入座。第一位入座的人是房主：可以等朋友加入，也可以把空位設為電腦後開始遊戲。</div>
   <div class="row">主題：<b id="lobbyThemeName"></b></div>
   <fieldset><legend>座位</legend><div id="seatRows"></div><div id="lobbyWait" class="err" style="color:#6b4f2a"></div></fieldset>
   <fieldset id="lobbyHost" hidden><legend>房主設定</legend>
     <div class="row">主題 <select id="onTheme"></select></div>
     <div class="row">電腦速度 <select id="onSpeed"><option value="900">慢（每步 5 秒）</option><option value="450" selected>中（每步 3 秒）</option><option value="120">快（每步 2 秒）</option></select></div>
-    <div class="row" style="justify-content:flex-end"><button id="lobbyStart" class="pri" style="font-size:20px;padding:10px 28px">開始遊戲</button></div>
+    <div class="row" style="justify-content:flex-end"><button id="lobbyFill">空位全部設為電腦</button><button id="lobbyStart" class="pri" style="font-size:20px;padding:10px 28px">開始遊戲</button></div>
   </fieldset>
-  <div class="row"><button id="rulesBtn1">遊戲說明</button><span id="netStatus" class="err"></span></div>
+  <div class="row"><button id="rulesBtn1">遊戲說明</button><button id="lobbyBack">返回桌位列表</button><span class="netStatus err"></span></div>
 </div>
 
 <div id="game" hidden>
   <div id="board"><img src="board-sanguo.svg" alt="三國風雲棋盤"><div id="feed" hidden></div></div>
   <aside>
-    <div style="display:flex;gap:8px"><button id="rulesBtn">遊戲說明</button></div>
+    <div style="display:flex;gap:8px"><button id="rulesBtn">遊戲說明</button><button id="standBtn" hidden>離座</button></div>
     <div id="msg"></div>
     <div id="players"></div>
     <div id="log"></div>

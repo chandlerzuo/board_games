@@ -267,7 +267,7 @@ function turnButtons(opts, onPick) {
 function showRules() {
   okLocal('遊戲說明書', TX.rulesHtml(E));
 }
-const showGame = () => { $('#setup').hidden = true; $('#lobby').hidden = true; $('#game').hidden = false; };
+const showGame = () => showScreen('game');
 
 /* ------------------------------------------------------------------ *
  *  單機版：引擎在本頁執行
@@ -319,19 +319,41 @@ function offlineStartClicked() {
  *  連線版：伺服器執行引擎；本頁收畫面與題目並送回作答
  * ------------------------------------------------------------------ */
 // 座位代碼存在分頁（sessionStorage）：同一瀏覽器開多個分頁即可扮演不同玩家，重新整理仍保留座位
-const ON = { token: sessionStorage.getItem('sanguo-token') || '', es: null, lobby: null, you: null, shown: new Set() };
-const api = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: ON.token, ...body }) })
+const ON = { token: sessionStorage.getItem('sanguo-token') || '', es: null, table: null, tables: null, lobby: null, you: null, shown: new Set() };
+// 所有請求都帶上座位代碼與目前看的桌號（離座、回答問題由伺服器依座位代碼判斷）
+const api = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: ON.token, table: ON.table, ...body }) })
   .then(r => r.json());
 // 讀取對話框中所有輸入欄位，送給伺服器判讀
 const formInputs = b => [...b.querySelectorAll('input')].map(i => ({ id: i.id || undefined, name: i.name || undefined, type: i.type, value: i.value, checked: i.checked, k: i.dataset.k }));
-function connect() {
+const setNet = text => document.querySelectorAll('.netStatus').forEach(e => { e.textContent = text; });
+const seated = () => ON.you?.seat != null;
+
+// 一次只顯示一個畫面
+function showScreen(name) {
+  for (const id of ['setup', 'tables', 'lobby', 'game']) $('#' + id).hidden = id !== name;
+}
+// 離開牌局畫面時清掉殘留的記錄、提示與對話框
+function clearGameUi() {
+  feedReset(false); $('#log').innerHTML = ''; $('#actions') && ($('#actions').innerHTML = ''); VIEW = null; ON.shown.clear();
+  modalChain = Promise.resolve(); if (modalCurrent) modalCurrent.close();
+  $('#modal').hidden = true; $('#game').hidden = true;
+}
+const updateStandBtn = () => { const b = $('#standBtn'); b.hidden = false; b.textContent = seated() ? '離座（交給電腦）' : '返回桌位列表'; };
+
+// table：要看的桌號；null 只看桌位列表（已入座者伺服器一律綁在自己的桌子上）
+function connect(table) {
   ON.es?.close();
-  const es = ON.es = new EventSource('/api/events?token=' + encodeURIComponent(ON.token));
+  ON.table = table ?? null; ON.lobby = null;
+  const es = ON.es = new EventSource('/api/events?token=' + encodeURIComponent(ON.token) + '&table=' + (table == null ? 'none' : table));
   es.onmessage = ev => {
     const m = JSON.parse(ev.data);
-    if (m.type === 'lobby') { ON.lobby = m.lobby; ON.you = m.you; if (!m.lobby.started) renderLobby(); }
-    else if (m.type === 'reset') { feedReset(false); $('#log').innerHTML = ''; VIEW = null; $('#game').hidden = true; renderLobby(); }
-    else if (m.type === 'view') { showGame(); renderView(m.view); }
+    if (m.type === 'tables') { ON.tables = m.tables; if (ON.table == null) renderTables(); }
+    else if (m.type === 'lobby') {
+      ON.table = m.table; ON.lobby = m.lobby; ON.you = m.you;
+      if (!m.lobby.started) renderLobby(); else if (!$('#game').hidden) updateStandBtn();
+    }
+    else if (m.type === 'reset') { clearGameUi(); if (ON.lobby) renderLobby(); }
+    else if (m.type === 'view') { showGame(); updateStandBtn(); renderView(m.view); }
     else if (m.type === 'log') addLog(m.html, m.meta);
     else if (m.type === 'dice') showDice(m.r);
     else if (m.type === 'flash') flashDeck(m.k);
@@ -345,59 +367,91 @@ function connect() {
         return !!r.ok;
       }, m.id);
     } else if (m.type === 'over') {
-      const seated = ON.you?.seat != null;
-      showModal(m.title, m.html, [{ label: seated ? '回到大廳開新局' : '確定', cls: 'pri' }],
-        async () => { if (seated) await api('/api/lobby', { op: 'reset' }); return true; });
+      const mine = seated();
+      showModal(m.title, m.html, [{ label: mine ? '回到大廳開新局' : '確定', cls: 'pri' }],
+        async () => { if (mine) await api('/api/lobby', { op: 'reset' }); return true; });
     }
   };
-  es.onerror = () => { $('#netStatus').textContent = '連線中斷，重新連線中……'; };
-  es.onopen = () => { $('#netStatus').textContent = ''; };
+  es.onerror = () => setNet('連線中斷，重新連線中……');
+  es.onopen = () => setNet('');
 }
+
+// 離座：牌局中由電腦接手；回到桌位列表
+async function leaveSeat() {
+  await api('/api/leave', {});
+  ON.token = ''; ON.you = null; sessionStorage.removeItem('sanguo-token');
+  clearGameUi(); connect(null);
+}
+function backToTables() { clearGameUi(); connect(null); }
+
+/* ---- 桌位列表 ---- */
+const cmdNameIn = (theme, j) => { const th = E.THEMES[theme]; return (th && th.cards && th.cards[COMMANDERS[j][0]]) || COMMANDERS[j][1]; };
+function renderTables() {
+  showScreen('tables');
+  $('#tableCards').innerHTML = (ON.tables || []).map(t => {
+    const th = E.THEMES[t.theme] || E.THEMES.sanguo;
+    const nh = t.seats.filter(s => s.state === 'human').length, na = t.seats.filter(s => s.state === 'ai').length;
+    const status = t.over ? `牌局已結束・${th.label}` : t.started ? `遊戲進行中・${th.label}（真人 ${nh}・電腦 ${na}）`
+      : nh + na === 0 ? '空桌，等你入座' : `等待中（真人 ${nh}・電腦 ${na}）`;
+    const seats = t.seats.map(s => s.state === 'open' ? '<span class="tseat open">空位</span>'
+      : `<span class="tseat ${s.state}">${esc(cmdNameIn(t.theme, s.cmd))}${s.state === 'ai' ? '・電腦' : s.online ? '' : '（離線）'}</span>`).join('');
+    const full = t.seats.every(s => s.state !== 'open');
+    return `<div class="tcard"><h3>第 ${t.id + 1} 桌</h3><div class="st">${status}</div><div class="tseats">${seats}</div>
+      <button data-table="${t.id}" class="${t.started || full ? '' : 'pri'}">${t.started || full ? '觀戰' : '入座'}</button></div>`;
+  }).join('');
+  $('#tableCards').querySelectorAll('[data-table]').forEach(b => b.onclick = () => connect(+b.dataset.table));
+}
+
+/* ---- 一桌的大廳 ---- */
 function renderLobby() {
-  $('#setup').hidden = true; $('#lobby').hidden = false;
+  showScreen('lobby');
   const L = ON.lobby, you = ON.you || {};
+  if (!L) return;
+  $('#lobbyNo').textContent = ON.table + 1;
   useTheme(L.theme);
   $('#onTheme').value = L.theme; $('#lobbyThemeName').textContent = E.THEMES[L.theme]?.label || '';
   const used = L.seats.filter(s => s.state !== 'open').map(s => s.cmd);
+  const free = COMMANDERS.map((c, j) => j).filter(j => !used.includes(j));
   $('#seatRows').innerHTML = L.seats.map((s, k) => {
     const sw = `<span class="swatch" style="background:${PLAYER_COLORS[k]}"></span> 第 ${k + 1} 位`;
     if (s.state === 'open') {
-      const free = COMMANDERS.map((c, j) => j).filter(j => !used.includes(j));
       return `<div class="row">${sw}　<i>空位</i>
-        ${you.seat == null && free.length ? `<select id="pick${k}">${free.map(j => `<option value="${j}">${cmdName(j)}</option>`).join('')}</select><button data-join="${k}" class="pri">以此主帥加入</button>` : ''}
+        ${you.seat == null && free.length ? `<select id="pick${k}">${free.map(j => `<option value="${j}">${cmdName(j)}</option>`).join('')}</select><button data-join="${k}" class="pri">以此主帥入座</button>` : ''}
         ${you.host && free.length ? `<button data-ai="${k}">設為電腦</button>` : ''}</div>`;
     }
     const who = s.state === 'ai' ? '電腦' : (s.mine ? '你' : '玩家') + (s.host ? '（房主）' : '') + (s.online ? '' : '（離線）');
     return `<div class="row">${sw}　<b>${cmdName(s.cmd)}</b>　${who}
-      ${(you.host && s.state === 'ai') || s.mine ? `<button data-open="${k}">${s.mine ? '離開座位' : '移除'}</button>` : ''}</div>`;
+      ${you.host && s.state === 'ai' ? `<button data-remove="${k}">移除</button>` : ''}${s.mine ? '<button data-leave>離座</button>' : ''}</div>`;
   }).join('');
   const nSeated = L.seats.filter(s => s.state !== 'open').length;
   $('#lobbyHost').hidden = !you.host;
-  $('#lobbyWait').textContent = you.host ? (nSeated < 2 ? '至少需要 2 位（可把空位設為電腦）。' : '')
-    : you.seat == null ? '選一個空位與主帥加入。第一位加入者為房主，由房主開始遊戲。' : '等待房主開始遊戲……';
+  $('#lobbyFill').hidden = !free.length;
+  $('#lobbyWait').textContent = you.host ? (nSeated < 2 ? '至少需要 2 位：等朋友入座，或按「空位全部設為電腦」。' : '人到齊了就按「開始遊戲」；空位會留給電腦。')
+    : you.seat == null ? '選一個空位與主帥入座。第一位入座者為房主，由房主開始遊戲。' : '等待房主開始遊戲……';
   $('#lobbyStart').disabled = nSeated < 2;
   $('#onSpeed').value = String(L.speed);
+  $('#lobbyBack').textContent = seated() ? '離座並返回桌位列表' : '返回桌位列表';
   $('#seatRows').querySelectorAll('[data-join]').forEach(b => b.onclick = async () => {
     const k = +b.dataset.join, r = await api('/api/join', { seat: k, cmd: +$('#pick' + k).value });
-    if (r.token) { ON.token = r.token; sessionStorage.setItem('sanguo-token', r.token); connect(); } else alert(r.error || '無法加入');
+    if (r.token) { ON.token = r.token; sessionStorage.setItem('sanguo-token', r.token); connect(r.table); } else alert(r.error || '無法入座');
   });
-  $('#seatRows').querySelectorAll('[data-ai]').forEach(b => b.onclick = () => {
-    const free = COMMANDERS.map((c, j) => j).filter(j => !used.includes(j));
-    api('/api/lobby', { op: 'ai', seat: +b.dataset.ai, cmd: free[0] });
-  });
-  $('#seatRows').querySelectorAll('[data-open]').forEach(b => b.onclick = async () => {
-    const k = +b.dataset.open, mine = L.seats[k].mine;
-    await api('/api/lobby', { op: 'open', seat: k });
-    if (mine) { ON.token = ''; sessionStorage.removeItem('sanguo-token'); connect(); }
-  });
+  $('#seatRows').querySelectorAll('[data-ai]').forEach(b => b.onclick = () => api('/api/lobby', { op: 'ai', seat: +b.dataset.ai, cmd: free[0] }));
+  $('#seatRows').querySelectorAll('[data-remove]').forEach(b => b.onclick = () => api('/api/lobby', { op: 'open', seat: +b.dataset.remove }));
+  $('#seatRows').querySelectorAll('[data-leave]').forEach(b => b.onclick = leaveSeat);
 }
 function startOnline() {
   FEED.skippable = false; // 連線版：節奏由伺服器控制
-  $('#setup').hidden = true; $('#lobby').hidden = false;
+  $('#setup').hidden = true;
   $('#onTheme').innerHTML = themeOptions();
   $('#onTheme').onchange = () => api('/api/lobby', { op: 'theme', theme: $('#onTheme').value });
-  $('#lobbyStart').onclick = () => api('/api/lobby', { op: 'start', speed: +$('#onSpeed').value, theme: $('#onTheme').value });
-  connect();
+  $('#lobbyStart').onclick = async () => { const r = await api('/api/lobby', { op: 'start', speed: +$('#onSpeed').value, theme: $('#onTheme').value }); if (r.error) alert(r.error); };
+  $('#lobbyFill').onclick = () => api('/api/lobby', { op: 'fillai' });
+  $('#lobbyBack').onclick = () => { if (seated()) leaveSeat(); else backToTables(); };
+  $('#standBtn').onclick = () => {
+    if (!seated()) return backToTables();
+    if (confirm('離座後，你的座位由電腦接手。確定要離座嗎？')) leaveSeat();
+  };
+  connect(null);
 }
 
 /* ---- 啟動 ---- */
@@ -405,6 +459,7 @@ $('#rulesBtn0').onclick = showRules;
 $('#feed').onclick = feedSkip;
 $('#rulesBtn').onclick = showRules;
 $('#rulesBtn1').onclick = showRules;
+$('#rulesBtn2').onclick = showRules;
 if (location.protocol === 'http:' || location.protocol === 'https:') startOnline();
 else {
   const qs = new URLSearchParams(location.search);

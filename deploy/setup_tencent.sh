@@ -186,7 +186,8 @@ CapabilityBoundingSet=
 SystemCallFilter=@system-service
 # a blocked call returns an error instead of killing Node (newer libuv tries io_uring and falls back)
 SystemCallErrorNumber=EPERM
-MemoryMax=400M
+# four tables = up to four game threads in this one process (about 50 MB each)
+MemoryMax=700M
 
 [Install]
 WantedBy=multi-user.target
@@ -247,7 +248,8 @@ Still to do by hand in the Lighthouse console > Firewall:
   - never open $APP_PORT; keep SSH (22) limited to your own IP
 Notes:
   - Anyone with the shared password can sit at any open seat and run the lobby. Share it like a house key.
-  - The server has one lobby, so only one game runs at a time.
+  - There are 4 tables, so up to 4 games run at once. A player who stands up is replaced by the computer;
+    when the last human leaves a table, the game ends and the table opens again.
   - Upgrade: build a new bundle, copy it over, and run this script again.
   - Take it off the machine: sudo bash $SRC/deploy/setup_tencent.sh --remove
   - Logs: journalctl -u $SVC -f      Listener check: ss -ltnp | grep $APP_PORT (must show 127.0.0.1)

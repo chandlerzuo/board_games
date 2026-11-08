@@ -57,7 +57,14 @@ Open `index.html` directly in a browser. Each seat can be a human or the compute
 node server/server.js          # or SANGUO_PORT=9000 node server/server.js
 ```
 
-Open <http://127.0.0.1:8765/> in several browser tabs or windows. Each tab is a separate player (the seat is remembered per tab, so reloading keeps your seat). The first player to join is the host, who can turn empty seats into computer players, choose the theme and start the game.
+Open <http://127.0.0.1:8765/> in several browser tabs or windows. Each tab is a separate player (the seat is remembered per tab, so reloading keeps your seat).
+
+**Four tables.** The first page lists 4 tables with who is sitting where. Pick one to sit down, or watch a game that is already running (a spectator never sees anyone's hand).
+- **Before the game:** sit at an open seat and pick a commander. The first player to sit is the host. They can wait for friends, or turn empty seats into computer players (one by one, or with 空位全部設為電腦), choose the theme and speed, and start. Each table has its own theme.
+- **During the game:** any player can stand up (離座). A computer takes over that seat and plays on. If the player stands up while a question is waiting, the game answers it with its default (usually the highlighted button).
+- **When everyone has stood up:** when the last human leaves, the game ends and the table opens again for new players. A player whose browser stays disconnected for 90 seconds is stood up automatically (`SANGUO_GRACE_MS` changes that), so a closed tab can't keep a table stuck.
+- **After a game:** any seated player can start a new one at the same table, with the same seats.
+- **Under the hood:** each running game lives in its own worker thread (`server/game_worker.js`) with its own copy of the rules engine, because the engine keeps one game's state in module variables.
 
 The game engine runs on the server, and each browser receives only that player's own view: your own hand, the public parts of the board, and cards you remember from public captures. Opponents' hands never reach your browser.
 
@@ -80,7 +87,7 @@ tar xzf board_games-<rev>.tar.gz && sudo bash board_games-<rev>/deploy/setup_ten
 - **What it checks before it says "done":** the game listens on loopback only, and anonymous requests to the page and the API get `401` with a login prompt. If anything fails it closes the public port again and stops.
 - **By hand, in the Lighthouse firewall:** allow TCP `8443` (from anywhere, or only your friends' CIDR ranges such as `203.0.113.0/24`). Never open `8765`. Keep SSH limited to your IP.
 - **Upgrade:** build a new bundle, copy it over, and run the script again. **Remove:** `sudo bash .../deploy/setup_tencent.sh --remove`, then delete the firewall rule.
-- **Limits:** the login is guandan's one shared password, not a per-person account. Anyone who has it can sit at any open seat and run the lobby, so share it only with people you want at the table. There is one lobby, so one game runs at a time. A mainland-China server may need an ICP filing for public access (see guandan's `docs/DEPLOY.md`). The browser shows a certificate warning once for this port.
+- **Limits:** the login is guandan's one shared password, not a per-person account. Anyone who has it can sit at any open seat and run a table's lobby, so share it only with people you want at the tables. There are 4 tables, so up to 4 games run at once (about 50 MB each; the service is capped at 700 MB). A mainland-China server may need an ICP filing for public access (see guandan's `docs/DEPLOY.md`). The browser shows a certificate warning once for this port.
 - **Not tried on a real server yet:** `deploy/setup_tencent.sh` has been syntax-checked, and the bundle has been unpacked and served locally, but the script itself has not been run on a Lighthouse machine.
 
 ### Before friends on other computers can join (without that server)
