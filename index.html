@@ -25,6 +25,18 @@
   .tseats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; min-height: 28px; }
   .tseat { padding: 2px 9px; border-radius: 12px; font-size: 14px; border: 1px solid #c9a96e; background: #fff; }
   .tseat.human { background: #dff0d8; } .tseat.ai { background: #e8eaf6; } .tseat.open { color: #999; border-style: dashed; }
+  /* 主題：古書封面（桌主點選，其他人只看得到選了哪一本） */
+  #themePick { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 4px 10px; }
+  .book { all: unset; box-sizing: border-box; display: block; position: relative; cursor: pointer; width: 76px; height: 106px; border-radius: 4px;
+          background: var(--bk); box-shadow: 0 3px 7px #0006; }
+  .book .slip { position: absolute; left: 12px; top: 9px; width: 28px; height: 86px; background: #f6efd9; border: 1px solid #b9a77d; outline: 1px solid #c0392b; outline-offset: -3px;
+                display: flex; align-items: center; justify-content: center; box-sizing: border-box; font-weight: 700; font-size: 15px; color: #1b1b1b; }
+  .book .slip i { font-style: normal; writing-mode: vertical-rl; text-orientation: upright; white-space: nowrap; line-height: 1.15; }
+  .book::after { content: ''; position: absolute; right: 7px; top: 8px; bottom: 8px; width: 2px; background: repeating-linear-gradient(#e8dcc0 0 9px, transparent 9px 22px); }
+  .book.on { outline: 3px solid #b03a2e; outline-offset: 4px; }
+  .book:disabled { cursor: default; opacity: .5; } .book.on:disabled { opacity: 1; }
+  .book:not(:disabled):hover { transform: translateY(-3px); }
+  #themeNote { font-size: 14px; color: #6b4f2a; }
   @media (max-width: 640px) { #tableCards { grid-template-columns: 1fr; } }
   #lobby .row, #lobby fieldset { margin: 8px 0; }
   #lobby fieldset { border: 1px solid #c9a96e; border-radius: 8px; }
@@ -158,10 +170,9 @@
 <div id="lobby" hidden>
   <h1><span class="themeTitle">三國風雲</span>　第 <span id="lobbyNo">1</span> 桌</h1>
   <div>選一個空位和主帥入座。第一位入座的人是房主：可以等朋友加入，也可以把空位設為電腦後開始遊戲。</div>
-  <div class="row">主題：<b id="lobbyThemeName"></b></div>
+  <fieldset><legend>主題</legend><div id="themePick"></div><div id="themeNote"></div></fieldset>
   <fieldset><legend>座位</legend><div id="seatRows"></div><div id="lobbyWait" class="err" style="color:#6b4f2a"></div></fieldset>
   <fieldset id="lobbyHost" hidden><legend>房主設定</legend>
-    <div class="row">主題 <select id="onTheme"></select></div>
     <div class="row">電腦速度 <select id="onSpeed"><option value="900">慢（每步 5 秒）</option><option value="450" selected>中（每步 3 秒）</option><option value="120">快（每步 2 秒）</option></select></div>
     <div class="row" style="justify-content:flex-end"><button id="lobbyFill">空位全部設為電腦</button><button id="lobbyStart" class="pri" style="font-size:20px;padding:10px 28px">開始遊戲</button></div>
   </fieldset>
